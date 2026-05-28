@@ -21,7 +21,7 @@ export function usePlayerEngine() {
     };
     cancelAnimationFrame(positionRaf.current);
     positionRaf.current = requestAnimationFrame(tick);
-  }, []);
+  }, [store]);
 
   const stopPositionTick = useCallback(() => {
     cancelAnimationFrame(positionRaf.current);
@@ -97,6 +97,7 @@ export function usePlayerEngine() {
     }
 
     return () => { stopPositionTick(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { playSong, handleNext, handlePrev };
@@ -109,17 +110,30 @@ export function usePlayer() {
   const store = usePlayerStore();
 
   const togglePlay = useCallback(() => {
+    const { isLoading, currentSong, position } = usePlayerStore.getState();
     if (audio.isPlaying()) {
       audio.pause();
+    } else if (isLoading) {
+      // Abort loading if user clicks spinner
+      audio.unload();
+      store.setIsLoading(false);
+      store.setIsPlaying(false);
     } else {
-      audio.play();
+      // If audio was unloaded due to timeout/error, reload it
+      if (!audio.hasHowl() && currentSong) {
+        store.setIsLoading(true);
+        store.setHasError(false);
+        audio.loadAndPlay(currentSong.url, position || 0);
+      } else {
+        audio.play();
+      }
     }
-  }, []);
+  }, [store]);
 
   const seekTo = useCallback((seconds) => {
     audio.seek(seconds);
     store.setPosition(seconds);
-  }, []);
+  }, [store]);
 
   const setVolume = useCallback((vol) => {
     store.setVolume(vol);
@@ -142,6 +156,15 @@ export function usePlayer() {
     const { volume, isMuted } = usePlayerStore.getState();
     audio.setVolume(isMuted ? 0 : volume);
     updateMediaSession(song);
+
+    // Strict 10-second timeout to break out of infinite loading if CDN is blocked
+    setTimeout(() => {
+      if (usePlayerStore.getState().isLoading && usePlayerStore.getState().currentSong?.id === song.id) {
+        audio.unload();
+        store.setIsLoading(false);
+        store.setHasError(true);
+      }
+    }, 10000);
   }, [store]);
 
   const playPlaylist = useCallback((playlist, startIndex = 0) => {

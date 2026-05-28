@@ -48,6 +48,10 @@ export function loadAndPlay(url, startPosition = 0) {
       callbacks.onLoad?.(howl.duration());
     },
     onloaderror: (id, err) => callbacks.onError?.(err),
+    onplayerror: (id, err) => {
+      howl.once('unlock', () => howl.play());
+      callbacks.onError?.(err);
+    },
     onseek: () => callbacks.onSeek?.(),
   });
 
@@ -56,6 +60,7 @@ export function loadAndPlay(url, startPosition = 0) {
 
 export function play() { howl?.play(); }
 export function pause() { howl?.pause(); }
+export function hasHowl() { return howl !== null; }
 
 export function seek(seconds) {
   if (howl) howl.seek(seconds);
@@ -63,8 +68,9 @@ export function seek(seconds) {
 
 export function setVolume(vol) {
   if (howl) howl.volume(vol);
-  // Also set Howler global for future instances
-  Howler.volume(vol);
+  if (typeof window !== 'undefined' && window.Howler) {
+    window.Howler.volume(vol);
+  }
 }
 
 export function getPosition() {

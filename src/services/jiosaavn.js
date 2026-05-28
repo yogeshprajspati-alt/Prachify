@@ -33,6 +33,18 @@ export function extractCover(image) {
   return image[2]?.url || image[1]?.url || image[0]?.url || '';
 }
 
+// Decode HTML entities in titles
+export function decodeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
 // Normalize raw API song → Prachify internal format
 export function normalizeSong(raw) {
   if (!raw) return null;
@@ -52,9 +64,9 @@ export function normalizeSong(raw) {
 
   return {
     id: raw.id,
-    title: raw.name,
-    artist,
-    album: raw.album?.name || '',
+    title: decodeHtml(raw.name),
+    artist: decodeHtml(artist),
+    album: decodeHtml(raw.album?.name || ''),
     url,
     cover: extractCover(raw.image),
     duration: Number(raw.duration) || 0,
@@ -96,11 +108,11 @@ async function apiFetch(path, retries = 1) {
 async function fetchWithFallback(subpath) {
   try {
     return await apiFetch(`/api${subpath}`);
-  } catch (e1) {
+  } catch {
     try {
       return await apiFetch(subpath);
-    } catch (e2) {
-      throw new Error(`API unreachable: ${e2.message}`);
+    } catch (err) {
+      throw new Error(`API unreachable: ${err.message}`);
     }
   }
 }
@@ -164,4 +176,134 @@ export async function getTrending(lang = 'hindi') {
 
 export async function searchAll(query) {
   return fetchWithFallback(`/search?query=${encodeURIComponent(query)}`);
+}
+
+// ── Smart Recommendations ─────────────────────────────────────────────────────
+// Picks top artists from liked songs & recently played, fetches more of their music.
+export async function getRecommendations(likedSongObjects = [], recentlyPlayedSongs = []) {
+  try {
+    // Count artist frequency across liked + recent
+    const artistCount = {};
+    const allSongs = [...likedSongObjects, ...recentlyPlayedSongs];
+    for (const song of allSongs) {
+      if (!song?.artist) continue;
+      // Split "Artist A, Artist B" into individual names
+      const names = song.artist.split(',').map(a => a.trim()).filter(Boolean);
+      for (const name of names) {
+        artistCount[name] = (artistCount[name] || 0) + 1;
+      }
+    }
+
+    // Pick top 3 most common artists
+    const topArtists = Object.entries(artistCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    if (topArtists.length === 0) return [];
+
+    const knownIds = new Set(allSongs.map(s => s?.id).filter(Boolean));
+
+    // Fetch songs for each artist in parallel
+    const results = await Promise.all(
+      topArtists.map(artist => searchSongs(artist, 10).catch(() => []))
+    );
+
+    // Flatten, deduplicate, filter out already-known songs
+    const seen = new Set();
+    return results.flat().filter(song => {
+      if (!song || seen.has(song.id) || knownIds.has(song.id)) return false;
+      seen.add(song.id);
+      return true;
+    }).slice(0, 15);
+  } catch {
+    return [];
+  }
+}
+
+// ── Daily Mix ─────────────────────────────────────────────────────────────────
+// Generates a fresh mix every day based on liked artists. Cached in localStorage.
+export async function getDailyMix(likedSongObjects = []) {
+  const today = new Date().toISOString().slice(0, 10); // "2026-05-29"
+  const cacheKey = `prachify_daily_mix_${today}`;
+
+  // Return cached mix if it already exists for today
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (e) { console.warn('Failed to read daily mix cache:', e); }
+
+  try {
+    // Pick up to 4 distinct artists from liked songs
+    const artists = [];
+    const seen = new Set();
+    for (const song of likedSongObjects) {
+      if (!song?.artist) continue;
+      const name = song.artist.split(',')[0].trim();
+      if (!seen.has(name)) { seen.add(name); artists.push(name); }
+      if (artists.length >= 4) break;
+    }
+
+    // Fallback queries if no liked songs yet
+    const queries = artists.length > 0
+      ? artists.map(a => `${a} hits`)
+      : ['top hindi hits 2024', 'trending bollywood', 'popular punjabi songs'];
+
+    const knownIds = new Set(likedSongObjects.map(s => s?.id).filter(Boolean));
+
+    const results = await Promise.all(
+      queries.map(q => searchSongs(q, 8).catch(() => []))
+    );
+
+    const seenIds = new Set();
+    const mix = results.flat().filter(song => {
+      if (!song || seenIds.has(song.id) || knownIds.has(song.id)) return false;
+      seenIds.add(song.id);
+      return true;
+    });
+
+    // Shuffle for variety
+    const shuffled = mix.sort(() => Math.random() - 0.5).slice(0, 20);
+
+    // Cache for the day
+    try { localStorage.setItem(cacheKey, JSON.stringify(shuffled)); } catch (e) { console.warn('Failed to cache daily mix:', e); }
+
+    return shuffled;
+  } catch {
+    return [];
+  }
+}
+
+// ── Hidden Gems ───────────────────────────────────────────────────────────────
+// Searches niche/underplayed queries and filters out songs the user already knows.
+export async function getHiddenGems(likedSongObjects = [], recentlyPlayedSongs = []) {
+  const nicheQueries = [
+    'indie hindi underrated 2023',
+    'underground punjabi new',
+    'lesser known bollywood gems',
+    'hidden hindi songs 2022',
+    'indie pop india 2024',
+    'underrated romantic hindi',
+  ];
+
+  try {
+    const knownIds = new Set(
+      [...likedSongObjects, ...recentlyPlayedSongs].map(s => s?.id).filter(Boolean)
+    );
+
+    // Pick 3 random niche queries so it feels different each session
+    const picked = nicheQueries.sort(() => Math.random() - 0.5).slice(0, 3);
+    const results = await Promise.all(
+      picked.map(q => searchSongs(q, 10).catch(() => []))
+    );
+
+    const seen = new Set();
+    return results.flat().filter(song => {
+      if (!song || seen.has(song.id) || knownIds.has(song.id)) return false;
+      seen.add(song.id);
+      return true;
+    }).slice(0, 15);
+  } catch {
+    return [];
+  }
 }

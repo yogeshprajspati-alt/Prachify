@@ -1,20 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import ImportPlaylistModal from '../components/ImportPlaylistModal';
 
 export default function Library() {
   const navigate = useNavigate();
-  const { playlists } = usePlayer();
   const customPlaylists = usePlayerStore(s => s.customPlaylists);
   const likedSongs = usePlayerStore(s => s.likedSongs);
   const createPlaylist = usePlayerStore(s => s.createPlaylist);
   const [filter, setFilter] = useState('All');
   const [showImport, setShowImport] = useState(false);
 
-  const all = [...playlists, ...customPlaylists];
-  const filters = ['All', 'Playlists', 'Albums'];
+  const filters = ['All', 'Playlists'];
 
   return (
     <div className="page" style={{ background: '#121212' }}>
@@ -66,7 +63,7 @@ export default function Library() {
       </button>
 
       {/* Playlist list */}
-      {all.map(pl => (
+      {customPlaylists.map(pl => (
         <button key={pl.id} onClick={() => navigate(`/playlist/${pl.id}`)}
           style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 16px', marginBottom: 4 }}>
           <img src={pl.cover} alt="" style={{ width: 56, height: 56, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.background = '#333'} />

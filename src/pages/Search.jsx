@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import { searchSongs } from '../services/jiosaavn';
@@ -26,8 +27,9 @@ function formatDur(s) {
 export default function Search() {
   const { currentSong, isPlaying, playSong } = usePlayer();
   const setAddToPlaylistSong = usePlayerStore(s => s.setAddToPlaylistSong);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(searchParams.get('q') || '');
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | searching | done | error
   const [errorMsg, setErrorMsg] = useState('');
@@ -69,13 +71,14 @@ export default function Search() {
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
-    if (!query.trim()) { setResults([]); setStatus('idle'); return; }
+    if (!query.trim()) { setResults([]); setStatus('idle'); setSearchParams({}); return; }
     setStatus('searching'); // immediate feedback
+    setSearchParams({ q: query });
     debounceRef.current = setTimeout(() => doSearch(query), 450);
     return () => clearTimeout(debounceRef.current);
-  }, [query, doSearch]);
+  }, [query, doSearch, setSearchParams]);
 
-  const clear = () => { setQuery(''); setResults([]); setStatus('idle'); inputRef.current?.focus(); };
+  const clear = () => { setQuery(''); setResults([]); setStatus('idle'); setSearchParams({}); inputRef.current?.focus(); };
 
   const handlePlay = (song) => {
     playSong(song, { id: 'search-results', songs: results, title: 'Search Results' });

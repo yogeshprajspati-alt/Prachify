@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function SongRow({ song, index, isActive, isPlaying, onClick, onAddToPlaylist }) {
+export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPlaylist }) {
   const formatTime = (secs) => {
     if (!secs || isNaN(secs)) return '—';
     const m = Math.floor(secs / 60);

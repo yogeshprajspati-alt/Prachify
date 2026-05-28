@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import playlistData from '../data/playlist.json';
-import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists, getUserId } from '../services/db';
+import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists } from '../services/db';
 
 function buildAllSongs(playlists) {
   return playlists.flatMap(pl =>
@@ -217,6 +217,28 @@ const usePlayerStore = create(
             if (pl.id !== playlistId) return pl;
             return { ...pl, songs: pl.songs.filter(s => s.id !== songId) };
           });
+          const pl = updated.find(p => p.id === playlistId);
+          if (pl) syncPlaylist(pl);
+          return { customPlaylists: updated };
+        });
+      },
+
+      renamePlaylist: (playlistId, newTitle) => {
+        set(s => {
+          const updated = s.customPlaylists.map(pl =>
+            pl.id === playlistId ? { ...pl, title: newTitle } : pl
+          );
+          const pl = updated.find(p => p.id === playlistId);
+          if (pl) syncPlaylist(pl);
+          return { customPlaylists: updated };
+        });
+      },
+
+      reorderPlaylistSongs: (playlistId, newSongs) => {
+        set(s => {
+          const updated = s.customPlaylists.map(pl =>
+            pl.id === playlistId ? { ...pl, songs: newSongs } : pl
+          );
           const pl = updated.find(p => p.id === playlistId);
           if (pl) syncPlaylist(pl);
           return { customPlaylists: updated };

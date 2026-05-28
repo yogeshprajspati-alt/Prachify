@@ -40,5 +40,5 @@ export function setMediaSessionState(state, position, duration) {
       playbackRate: 1,
       position: Math.min(position, duration || 0),
     });
-  } catch (_) {}
+  } catch (err) { console.warn('Failed to set media position state:', err); }
 }

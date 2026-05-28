@@ -11,6 +11,7 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Library from './pages/Library';
 import PlaylistPage from './pages/PlaylistPage';
+import Explore from './pages/Explore';
 import './styles/globals.css';
 
 export default function App() {
@@ -25,7 +26,7 @@ export default function App() {
   useEffect(() => {
     hydrateLikedFromDB();
     hydratePlaylistsFromDB();
-  }, []);
+  }, [hydrateLikedFromDB, hydratePlaylistsFromDB]);
 
   return (
     <Router>
@@ -33,6 +34,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/explore" element={<Explore />} />
           <Route path="/library" element={<Library />} />
           <Route path="/playlist/:id" element={<PlaylistPage />} />
         </Routes>
