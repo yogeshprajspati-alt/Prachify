@@ -156,13 +156,25 @@ const usePlayerStore = create(
 
       // Load liked songs from DB on startup
       hydrateLikedFromDB: async () => {
-        const songs = await fetchLikedSongs();
-        if (songs) {
-          set({
-            likedSongs: songs.map(s => s.id),
-            likedSongObjects: songs,
-          });
+        const dbSongs = await fetchLikedSongs();
+        if (!dbSongs) return;
+
+        const localLikedSongObjects = get().likedSongObjects || [];
+        const dbSongIds = new Set(dbSongs.map(s => s.id));
+        const mergedSongs = [...dbSongs];
+
+        for (const localSong of localLikedSongObjects) {
+          if (!dbSongIds.has(localSong.id)) {
+            await syncLike(localSong);
+            mergedSongs.push(localSong);
+            dbSongIds.add(localSong.id);
+          }
         }
+
+        set({
+          likedSongs: mergedSongs.map(s => s.id),
+          likedSongObjects: mergedSongs,
+        });
       },
 
       // ── Custom Playlists ──────────────────────────────────────────────────
@@ -212,10 +224,40 @@ const usePlayerStore = create(
       },
 
       hydratePlaylistsFromDB: async () => {
-        const playlists = await fetchPlaylists();
-        if (playlists?.length) {
-          set({ customPlaylists: playlists });
+        const dbPlaylists = await fetchPlaylists();
+        if (!dbPlaylists) return;
+
+        const localPlaylists = get().customPlaylists || [];
+        const mergedPlaylists = [...dbPlaylists];
+
+        for (const localPl of localPlaylists) {
+          const dbPlIdx = mergedPlaylists.findIndex(p => p.id === localPl.id);
+          if (dbPlIdx === -1) {
+            // Local-only playlist: sync to DB and add to merged list
+            await syncPlaylist(localPl);
+            mergedPlaylists.push(localPl);
+          } else {
+            // Playlist exists in both: merge songs
+            const dbPl = mergedPlaylists[dbPlIdx];
+            const mergedSongs = [...dbPl.songs];
+            let changed = false;
+
+            for (const localSong of localPl.songs) {
+              if (!mergedSongs.some(s => s.id === localSong.id)) {
+                mergedSongs.push(localSong);
+                changed = true;
+              }
+            }
+
+            if (changed) {
+              const updatedPl = { ...dbPl, songs: mergedSongs };
+              await syncPlaylist(updatedPl);
+              mergedPlaylists[dbPlIdx] = updatedPl;
+            }
+          }
         }
+
+        set({ customPlaylists: mergedPlaylists });
       },
 
       // ── Lookups ───────────────────────────────────────────────────────────

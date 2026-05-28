@@ -40,6 +40,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // ───────────────────────────────────────────────────────────────────────────────
 
 const ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
+console.log('[DB] Supabase initialization:', { enabled: ENABLED, url: SUPABASE_URL });
 
 // Get or create anonymous user ID
 export function getUserId() {
@@ -76,7 +77,7 @@ async function supabase(path, method = 'GET', body = null) {
 export async function syncLike(song) {
   if (!ENABLED) return;
   const userId = getUserId();
-  await supabase('user_tracks', 'POST', {
+  await supabase('user_tracks?on_conflict=user_id,song_id', 'POST', {
     user_id: userId,
     song_id: song.id,
     song_data: song,
@@ -101,7 +102,7 @@ export async function fetchLikedSongs() {
 export async function syncPlaylist(playlist) {
   if (!ENABLED) return;
   const userId = getUserId();
-  await supabase('user_playlists', 'POST', {
+  await supabase('user_playlists?on_conflict=user_id,playlist_id', 'POST', {
     user_id: userId,
     playlist_id: playlist.id,
     playlist_data: playlist,
