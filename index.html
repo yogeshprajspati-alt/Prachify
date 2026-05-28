@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <!-- Theme & App Colors -->
+  <meta name="theme-color" content="#0B0B0F" />
+  <meta name="background-color" content="#0B0B0F" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- SEO Optimization Meta Tags -->
+  <title>Prachify — Your Personal Music Space</title>
+  <meta name="description"
+    content="An intimate, premium, minimalist music streaming web application curated specifically for late-night emotional vibes." />
+
+  <!-- Open Graph for social previews -->
+  <meta property="og:title" content="Prachify" />
+  <meta property="og:description" content="Your personal late-night music space 🎧" />
+  <meta property="og:type" content="website" />
+
+  <!-- Preconnect Google Fonts for rapid delivery -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+</head>
+
+<body class="bg-[#0B0B0F]">
+  <div id="root">
+    <!-- Premium Spotify-inspired loading splash loader -->
+    <div
+      style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0B0B0F; gap: 24px; font-family: 'Inter', sans-serif; color: #FFFFFF; z-index: 9999;">
+      <!-- Pulsing Spotify-style waves logo -->
+      <svg viewBox="0 0 24 24"
+        style="width: 80px; height: 80px; animation: spotifyPulse 1.8s ease-in-out infinite; cursor: default;">
+        <defs>
+          <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FF7EB6" />
+            <stop offset="100%" stopColor="#9D7CFF" />
+          </linearGradient>
+        </defs>
+        <!-- Outer circle -->
+        <circle cx="12" cy="12" r="10" fill="none" stroke="url(#logoGrad)" strokeWidth="1.8" />
+        <!-- Inner soundwaves -->
+        <path d="M8.5 9.5c2.3-1 4.7-1 7 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.5"
+          strokeLinecap="round" />
+        <path d="M7.3 12c3.1-1.3 6.3-1.3 9.4 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.6"
+          strokeLinecap="round" />
+        <path d="M6.5 14.5c3.6-1.5 7.4-1.5 11 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.7"
+          strokeLinecap="round" />
+      </svg>
+
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
+        <h1
+          style="font-size: 26px; font-weight: 800; margin: 0; background: linear-gradient(135deg, #FF7EB6, #9D7CFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.8px;">
+          Prachify</h1>
+        <p
+          style="font-size: 9px; color: #60607A; text-transform: uppercase; letter-spacing: 3px; font-weight: 600; margin: 0;">
+          for when the world is quiet</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.jsx"></script>
+
+  <style>
+    @keyframes spotifyPulse {
+
+      0%,
+      100% {
+        transform: scale(0.96);
+        opacity: 0.8;
+        filter: drop-shadow(0 0 12px rgba(255, 126, 182, 0.25));
+      }
+
+      50% {
+        transform: scale(1.03);
+        opacity: 1;
+        filter: drop-shadow(0 0 28px rgba(255, 126, 182, 0.6));
+      }
+    }
+  </style>
+</body>
+
+</html>

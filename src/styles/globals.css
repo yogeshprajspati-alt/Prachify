@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #121212;
+  color: #fff;
+  height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #121212;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+}
+
+button, a { outline: none; }
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Hide scrollbars */
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+/* EQ animation */
+.eq-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 1px;
+  background: #1DB954;
+  transform-origin: bottom;
+  animation: eq 0.8s ease-in-out infinite alternate;
+}
+.eq-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+.eq-bar:nth-child(2) { height: 13px; animation-delay: 0.15s; }
+.eq-bar:nth-child(3) { height: 9px; animation-delay: 0.05s; }
+
+@keyframes eq {
+  from { transform: scaleY(0.3); }
+  to   { transform: scaleY(1); }
+}
+
+/* Slide up */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.slide-up { animation: slideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fadeIn 0.25s ease both; }
+
+/* Page scroll container */
+.page {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 140px;
+}
