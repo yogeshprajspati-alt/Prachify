@@ -42,14 +42,10 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
 console.log('[DB] Supabase initialization:', { enabled: ENABLED, url: SUPABASE_URL });
 
-// Get or create anonymous user ID
+// Since this is a private app for a single user, we hardcode the ID.
+// This ensures every device (PC, phone, tablet) shares the exact same database.
 export function getUserId() {
-  let id = localStorage.getItem('prachify_uid');
-  if (!id) {
-    id = 'usr_' + crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-    localStorage.setItem('prachify_uid', id);
-  }
-  return id;
+  return 'prachify_private_admin_user';
 }
 
 async function supabase(path, method = 'GET', body = null) {
