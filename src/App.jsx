@@ -14,7 +14,10 @@ import PlaylistPage from './pages/PlaylistPage';
 import Explore from './pages/Explore';
 import ArtistPage from './pages/ArtistPage';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import useChatStore from './store/chatStore';
 import './styles/globals.css';
+
+const HannahChat = React.lazy(() => import('./components/HannahChat'));
 
 export default function App() {
   usePlayerEngine();
@@ -66,6 +69,42 @@ export default function App() {
           song={addToPlaylistSong}
           onClose={() => setAddToPlaylistSong(null)}
         />
+
+        {/* Hannah Chat FAB */}
+        <button
+          onClick={() => useChatStore.getState().toggleChat()}
+          style={{
+            position: 'fixed',
+            bottom: 120, // above bottom player
+            right: 16,
+            width: 54,
+            height: 54,
+            borderRadius: '50%',
+            background: '#282828',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 150,
+            transition: 'transform 0.2s',
+          }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+          onTouchStart={e => e.currentTarget.style.transform = 'scale(0.9)'}
+          onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
+        >
+          <span style={{ fontSize: 28, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))', transform: 'translateY(-1px)' }}>
+            🌸
+          </span>
+        </button>
+
+        {/* Lazy Loaded Chat Interface */}
+        <React.Suspense fallback={null}>
+          <HannahChat />
+        </React.Suspense>
+
       </div>
     </Router>
   );

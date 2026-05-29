@@ -23,8 +23,10 @@ export function setCallbacks(cbs) {
 
 export function loadAndPlay(url, startPosition = 0) {
   if (howl && currentUrl === url) {
-    if (startPosition > 0) howl.seek(startPosition);
-    howl.play();
+    howl.seek(startPosition);
+    if (!howl.playing()) {
+      howl.play();
+    }
     return;
   }
 
