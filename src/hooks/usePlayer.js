@@ -10,13 +10,32 @@ import { updateMediaSession, setMediaSessionHandlers, setMediaSessionState } fro
 export function usePlayerEngine() {
   const store = usePlayerStore();
   const positionRaf = useRef(null);
+  const playbackRate = usePlayerStore(s => s.playbackRate);
+
+  // Sync playback rate immediately when store changes
+  useEffect(() => {
+    audio.setPlaybackRate(playbackRate);
+  }, [playbackRate]);
 
   const startPositionTick = useCallback(() => {
-    const tick = () => {
-      const pos = audio.getPosition();
-      const dur = audio.getDuration();
-      store.setPosition(pos);
-      if (dur > 0) setMediaSessionState('playing', pos, dur);
+    let last = 0;
+    const tick = (ts) => {
+      if (ts - last > 200) { // ~5fps — seek bar doesn't need 60fps
+        last = ts;
+        const pos = audio.getPosition();
+        const dur = audio.getDuration();
+        store.setPosition(pos);
+
+        // A-B loop check
+        const { abLoop } = usePlayerStore.getState();
+        if (abLoop.active && abLoop.a !== null && abLoop.b !== null) {
+          if (pos >= abLoop.b) {
+            audio.seek(abLoop.a);
+          }
+        }
+
+        if (dur > 0) setMediaSessionState('playing', pos, dur);
+      }
       positionRaf.current = requestAnimationFrame(tick);
     };
     cancelAnimationFrame(positionRaf.current);
@@ -36,10 +55,69 @@ export function usePlayerEngine() {
     updateMediaSession(song);
   }, [store]);
 
+  const handleQueueEnd = useCallback(async () => {
+    const { smartQueueEnabled, currentSong, radioSeeds, queue } = usePlayerStore.getState();
+    if (!smartQueueEnabled || !currentSong) return;
+
+    // radioSeeds mein songs hain to wahan se lo
+    if (radioSeeds.length > 0) {
+      const next = radioSeeds[0];
+      const remaining = radioSeeds.slice(1);
+      usePlayerStore.getState().setRadioSeeds(remaining);
+
+      // Queue mein add karo aur play karo
+      const newQueue = [...queue, next];
+      usePlayerStore.getState().setQueue(newQueue, newQueue.length - 1);
+      playSong(next);
+
+      // Background mein aur songs fetch karo agar buffer low hai
+      if (remaining.length < 3) {
+        const artistName = currentSong.artist?.split(',')[0]?.trim();
+        if (artistName) {
+          import('../services/jiosaavn').then(({ searchSongs }) => {
+            searchSongs(artistName, 10).then(results => {
+              const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
+              const fresh = results.filter(s => !queueIds.has(s.id)).slice(0, 6);
+              usePlayerStore.getState().setRadioSeeds(fresh);
+            }).catch(() => {});
+          });
+        }
+      }
+      return;
+    }
+
+    // Buffer khali hai — fresh fetch karo
+    const artistName = currentSong.artist?.split(',')[0]?.trim();
+    if (!artistName) return;
+
+    try {
+      const { searchSongs } = await import('../services/jiosaavn');
+      const results = await searchSongs(artistName, 10);
+      const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
+      const filtered = results.filter(s => s.id !== currentSong.id && !queueIds.has(s.id)).slice(0, 6);
+
+      if (filtered.length > 0) {
+        const next = filtered[0];
+        usePlayerStore.getState().setRadioSeeds(filtered.slice(1));
+        const newQueue = [...usePlayerStore.getState().queue, next];
+        usePlayerStore.getState().setQueue(newQueue, newQueue.length - 1);
+        playSong(next);
+      }
+    } catch {}
+  }, [playSong]);
+
   const handleNext = useCallback(() => {
-    const next = store.nextSong();
-    if (next) playSong(next);
-  }, [store, playSong]);
+    const { currentSong, position } = usePlayerStore.getState();
+    if (currentSong && position < 30) {
+      usePlayerStore.getState().recordSkip(currentSong.id);
+    }
+    const nextSong = store.nextSong();
+    if (nextSong) {
+      playSong(nextSong);
+    } else {
+      handleQueueEnd();
+    }
+  }, [store, playSong, handleQueueEnd]);
 
   const handlePrev = useCallback(() => {
     const pos = audio.getPosition();
@@ -70,8 +148,9 @@ export function usePlayerEngine() {
         store.setPosition(0);
         handleNext();
       },
-      onLoad: (duration) => {
-        store.setDuration(duration);
+      onLoad: (dur) => {
+        audio.setPlaybackRate(usePlayerStore.getState().playbackRate);
+        store.setDuration(dur);
         store.setIsLoading(false);
       },
       onError: () => {
@@ -180,13 +259,17 @@ export function usePlayer() {
   }, [store]);
 
   const next = useCallback(() => {
-    const next = store.nextSong();
-    if (next) {
-      store.setCurrentSong(next);
-      audio.loadAndPlay(next.url, 0);
+    const { currentSong, position } = usePlayerStore.getState();
+    if (currentSong && position < 30) {
+      usePlayerStore.getState().recordSkip(currentSong.id);
+    }
+    const nextSong = store.nextSong();
+    if (nextSong) {
+      store.setCurrentSong(nextSong);
+      audio.loadAndPlay(nextSong.url, 0);
       const { volume, isMuted } = usePlayerStore.getState();
       audio.setVolume(isMuted ? 0 : volume);
-      updateMediaSession(next);
+      updateMediaSession(nextSong);
     }
   }, [store]);
 

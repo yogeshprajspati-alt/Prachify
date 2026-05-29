@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import FullscreenPlayer from './FullscreenPlayer';
 import usePlayerStore from '../store/playerStore';
+import MiniLyrics from './MiniLyrics';
 
 export default function BottomPlayer() {
-  const { currentSong, isPlaying, isLoading, position, duration, queue, queueIndex, togglePlay, next, prev, seekTo, volume, isMuted, setVolume, toggleMute, jumpToQueueSong } = usePlayer();
+  const navigate = useNavigate();
+  const { currentSong, isPlaying, isLoading, position, duration, queue, queueIndex, togglePlay, next, prev, seekTo, volume, isMuted, setVolume, toggleMute, jumpToQueueSong, playSong } = usePlayer();
   const shuffle = usePlayerStore(s => s.shuffle);
   const repeatMode = usePlayerStore(s => s.repeatMode);
   const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
@@ -21,6 +24,7 @@ export default function BottomPlayer() {
 
   return (
     <>
+      <MiniLyrics song={currentSong} position={position} />
       {/* ── Mini player ────────────────────────────────────────────────── */}
       <div style={{
         position: 'fixed', bottom: 56, left: '50%', transform: 'translateX(-50%)',
@@ -37,9 +41,9 @@ export default function BottomPlayer() {
           overflow: 'hidden',
           boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
         }}>
-          {/* Progress bar */}
-          <div style={{ height: 2, background: 'rgba(255,255,255,0.08)' }}>
-            <div style={{ height: '100%', background: '#1DB954', width: `${pct}%`, transition: 'width 0.1s linear', borderRadius: 1 }} />
+          {/* Progress bar — scaleX instead of width for GPU-composited animation */}
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: '#1DB954', width: '100%', transform: `scaleX(${pct / 100})`, transformOrigin: 'left', transition: 'transform 0.2s linear', borderRadius: 1 }} />
           </div>
 
           {/* Row */}
@@ -65,7 +69,12 @@ export default function BottomPlayer() {
             {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentSong.title}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentSong.artist}</div>
+              <div
+                onClick={(e) => { e.stopPropagation(); navigate(`/artist/${encodeURIComponent(currentSong.artist?.split(',')[0]?.trim())}`); setExpanded(false); }}
+                style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+              >
+                {currentSong.artist}
+              </div>
             </div>
 
             {/* Controls */}
@@ -108,6 +117,7 @@ export default function BottomPlayer() {
           volume={volume} isMuted={isMuted} onVolumeChange={setVolume} onToggleMute={toggleMute}
           shuffle={shuffle} repeatMode={repeatMode}
           onToggleShuffle={toggleShuffle} onCycleRepeat={cycleRepeat}
+          onPlaySuggestion={(song) => playSong(song)}
         />
       )}
 

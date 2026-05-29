@@ -24,6 +24,8 @@ function formatDur(s) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
+const _searchCache = {};
+
 export default function Search() {
   const { currentSong, isPlaying, playSong } = usePlayer();
   const setAddToPlaylistSong = usePlayerStore(s => s.setAddToPlaylistSong);
@@ -40,6 +42,20 @@ export default function Search() {
   const doSearch = useCallback(async (q) => {
     if (!q.trim()) { setResults([]); setStatus('idle'); return; }
 
+    // Offline check
+    if (!navigator.onLine) {
+      setStatus('error');
+      setErrorMsg('No internet connection. Please check your network.');
+      return;
+    }
+
+    // Cache check — instant results for repeat queries
+    if (_searchCache[q]) {
+      setResults(_searchCache[q]);
+      setStatus('done');
+      return;
+    }
+
     // Abort in-flight request
     abortRef.current?.abort();
     abortRef.current = { aborted: false, abort() { this.aborted = true; } };
@@ -47,10 +63,12 @@ export default function Search() {
 
     setStatus('searching');
     setErrorMsg('');
+    // Results clear nahi karo — purane results tab tak dikhe jab tak naye na aayein
 
     try {
       const songs = await searchSongs(q, 25);
       if (token.aborted) return;
+      _searchCache[q] = songs; // cache kar lo
       setResults(songs);
       setStatus('done');
     } catch (err) {
@@ -100,7 +118,11 @@ export default function Search() {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => {
+              setQuery(e.target.value);
+              if (e.target.value.trim()) setStatus('searching');
+              else setStatus('idle');
+            }}
             placeholder="Songs, artists..."
             autoCorrect="off"
             autoCapitalize="off"
@@ -124,9 +146,20 @@ export default function Search() {
 
       {/* Status: Searching */}
       {status === 'searching' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 16px' }}>
-          <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #333', borderTop: '2px solid #1DB954', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: '#b3b3b3' }}>Searching JioSaavn...</span>
+        <div style={{ padding: '0 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #333', borderTop: '2px solid #1DB954', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: 13, color: '#b3b3b3' }}>Searching Prachify...</span>
+          </div>
+          {[1,2,3,4,5].map(i => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
+              <div style={{ width: 50, height: 50, borderRadius: 4, background: 'rgba(255,255,255,0.06)', flexShrink: 0, animation: 'shimmer 1.4s ease-in-out infinite' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ height: 13, borderRadius: 6, background: 'rgba(255,255,255,0.06)', marginBottom: 8, width: '65%', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+                <div style={{ height: 11, borderRadius: 6, background: 'rgba(255,255,255,0.04)', width: '40%', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -215,7 +248,13 @@ export default function Search() {
         </div>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes shimmer {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

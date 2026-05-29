@@ -89,12 +89,22 @@ export function isPlaying() {
   return howl ? howl.playing() : false;
 }
 
-export function stop() { howl?.stop(); }
-
 export function unload() {
   if (howl) {
     howl.unload();
     howl = null;
     currentUrl = null;
   }
+}
+
+export function setPlaybackRate(rate) {
+  if (!howl) return;
+  // Howler HTML5 mode mein _sounds[0]._node = actual <audio> element
+  const node = howl?._sounds?.[0]?._node;
+  if (node) node.playbackRate = rate;
+}
+
+export function getPlaybackRate() {
+  const node = howl?._sounds?.[0]?._node;
+  return node?.playbackRate ?? 1.0;
 }

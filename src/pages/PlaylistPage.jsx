@@ -51,6 +51,8 @@ export default function PlaylistPage() {
   const [reorderMode, setReorderMode] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const playlist = getPlaylistById(id);
   const isCustom = id?.startsWith('custom-');
@@ -63,6 +65,13 @@ export default function PlaylistPage() {
       <button onClick={() => navigate('/')} style={{ background: '#1DB954', color: '#000', border: 'none', borderRadius: 20, padding: '12px 24px', fontWeight: 700, cursor: 'pointer' }}>Go home</button>
     </div>
   );
+
+  const filteredSongs = searchQuery.trim()
+    ? playlist.songs.filter(s =>
+        s.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.artist?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : playlist.songs;
 
   const totalDur = playlist.songs.reduce((a, s) => a + (s.duration || 0), 0);
   const durLabel = totalDur > 3600
@@ -113,12 +122,24 @@ export default function PlaylistPage() {
       <div style={{ background: 'linear-gradient(180deg, #5a3a7e 0%, #121212 100%)', paddingBottom: 24 }}>
 
         {/* Top bar */}
-        <div style={{ padding: '52px 16px 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '52px 16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button onClick={() => navigate(-1)} style={circleBtn}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
+
+          {/* Search toggle */}
+          {playlist.songs.length > 5 && (
+            <button
+              onClick={() => { setSearchOpen(o => !o); setSearchQuery(''); }}
+              style={{ ...circleBtn, background: searchOpen ? 'rgba(29,185,84,0.2)' : 'rgba(0,0,0,0.35)' }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={searchOpen ? '#1DB954' : '#fff'} strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Cover */}
@@ -156,6 +177,53 @@ export default function PlaylistPage() {
           <p style={{ fontSize: 12, color: '#b3b3b3' }}>{playlist.songs.length} songs · {durLabel}</p>
         </div>
       </div>
+
+      {/* Search bar — sirf tab dikhao jab open ho */}
+      {searchOpen && (
+        <div style={{ padding: '0 16px 16px' }}>
+          <div style={{ position: 'relative' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+              stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round"
+              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+            >
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input
+              autoFocus
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search in playlist..."
+              style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 10,
+                padding: '10px 12px 10px 36px',
+                color: '#fff',
+                fontSize: 14,
+                outline: 'none',
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 16, padding: 4 }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Results count */}
+          {searchQuery && (
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 8, marginBottom: 0 }}>
+              {filteredSongs.length} result{filteredSongs.length !== 1 ? 's' : ''} for "{searchQuery}"
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Action pill row (custom playlists only) ──────────────── */}
       {isCustom && (
@@ -228,7 +296,7 @@ export default function PlaylistPage() {
 
       {/* ── Song list ────────────────────────────────────────────── */}
       <div style={{ padding: '4px 0' }}>
-        {playlist.songs.map((song, i) => {
+        {filteredSongs.map((song, i) => {
           const active = currentSong?.id === song.id;
           const isDragging = dragIndex === i;
           const isDragOver = dragOverIndex === i;
@@ -314,6 +382,14 @@ export default function PlaylistPage() {
             </div>
           );
         })}
+
+        {filteredSongs.length === 0 && searchQuery && (
+          <div style={{ textAlign: 'center', padding: '40px 16px' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No results</div>
+            <div style={{ fontSize: 13, color: '#b3b3b3' }}>No songs match "{searchQuery}"</div>
+          </div>
+        )}
 
         {playlist.songs.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 16px' }}>

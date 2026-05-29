@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import { getTrending, getRecommendations, getDailyMix, getHiddenGems } from '../services/jiosaavn';
+import { SongScroll, SkeletonRow } from '../components/SongScroll';
+
+// Module-level cache — survives navigation (trending, recs, gems)
+const _homeCache = {};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -13,6 +17,7 @@ export default function Home() {
   const likedSongs = usePlayerStore(s => s.likedSongs);
   const likedSongObjects = usePlayerStore(s => s.likedSongObjects);
   const customPlaylists = usePlayerStore(s => s.customPlaylists);
+  const skippedSongs = usePlayerStore(s => s.skippedSongs);
 
   const [trending, setTrending] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -38,20 +43,30 @@ export default function Home() {
     if (fetched.current) return;
     fetched.current = true;
 
-    // Load all sections in parallel — non-blocking
-    getTrending().then(s => setTrending(s.slice(0, 10))).catch(() => {});
+    // Serve from module-level cache when navigating back
+    if (_homeCache.trending) { setTrending(_homeCache.trending); }
+    else { getTrending().then(s => { const t = s.slice(0, 10); _homeCache.trending = t; setTrending(t); }).catch(() => {}); }
 
-    getRecommendations(likedSongObjects, recentObjects)
-      .then(setRecommendations)
-      .finally(() => setLoadingRecs(false));
+    if (_homeCache.recommendations) { setRecommendations(_homeCache.recommendations); setLoadingRecs(false); }
+    else {
+      getRecommendations(likedSongObjects, recentObjects, skippedSongs)
+        .then(r => { _homeCache.recommendations = r; setRecommendations(r); })
+        .finally(() => setLoadingRecs(false));
+    }
 
-    getDailyMix(likedSongObjects)
-      .then(setDailyMix)
-      .finally(() => setLoadingMix(false));
+    if (_homeCache.dailyMix) { setDailyMix(_homeCache.dailyMix); setLoadingMix(false); }
+    else {
+      getDailyMix(likedSongObjects)
+        .then(m => { _homeCache.dailyMix = m; setDailyMix(m); })
+        .finally(() => setLoadingMix(false));
+    }
 
-    getHiddenGems(likedSongObjects, recentObjects)
-      .then(setHiddenGems)
-      .finally(() => setLoadingGems(false));
+    if (_homeCache.hiddenGems) { setHiddenGems(_homeCache.hiddenGems); setLoadingGems(false); }
+    else {
+      getHiddenGems(likedSongObjects, recentObjects)
+        .then(g => { _homeCache.hiddenGems = g; setHiddenGems(g); })
+        .finally(() => setLoadingGems(false));
+    }
   }, []);  // eslint-disable-line
 
   // Sleek, compact quick-access tiles
@@ -247,35 +262,6 @@ export default function Home() {
   );
 }
 
-/* ── Shared horizontal song scroller ─────────────────────────────── */
-function SongScroll({ songs, currentSong, isPlaying, onPlay }) {
-  return (
-    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 16px 8px', scrollbarWidth: 'none' }}>
-      {songs.map(song => (
-        <SongCard key={song.id} song={song}
-          isActive={currentSong?.id === song.id} isPlaying={isPlaying}
-          onClick={() => onPlay(song)} />
-      ))}
-    </div>
-  );
-}
-
-/* ── Skeleton loading shimmer ─────────────────────────────────────── */
-function SkeletonRow() {
-  return (
-    <div style={{ display: 'flex', gap: 12, padding: '0 16px 8px', overflowX: 'hidden' }}>
-      {[1, 2, 3].map(i => (
-        <div key={i} style={{ flexShrink: 0, width: 136 }}>
-          <div style={{ width: 136, height: 136, borderRadius: 10, background: 'rgba(255,255,255,0.06)', marginBottom: 8, animation: 'shimmer 1.4s ease-in-out infinite' }} />
-          <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.06)', marginBottom: 6, width: '80%', animation: 'shimmer 1.4s ease-in-out infinite' }} />
-          <div style={{ height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.04)', width: '55%', animation: 'shimmer 1.4s ease-in-out infinite' }} />
-        </div>
-      ))}
-      <style>{`@keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }`}</style>
-    </div>
-  );
-}
-
 /* ── Section wrapper ──────────────────────────────────────────────── */
 function Section({ title, onSeeAll, children }) {
   return (
@@ -290,25 +276,6 @@ function Section({ title, onSeeAll, children }) {
       </div>
       {children}
     </div>
-  );
-}
-
-/* ── Song card ────────────────────────────────────────────────────── */
-function SongCard({ song, isActive, isPlaying, onClick }) {
-  return (
-    <button onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', flexShrink: 0, width: 136, fontFamily: 'inherit' }}>
-      <div style={{ position: 'relative', width: 136, height: 136, borderRadius: 10, overflow: 'hidden', marginBottom: 8, background: '#282828' }}>
-        <img src={song.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={e => { e.target.style.display = 'none'; }} />
-        {isActive && isPlaying && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 8, gap: 2 }}>
-            <span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" />
-          </div>
-        )}
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? '#1DB954' : '#fff', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{song.title}</div>
-      <div style={{ fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{song.artist}</div>
-    </button>
   );
 }
 

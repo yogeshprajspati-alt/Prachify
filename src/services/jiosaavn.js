@@ -27,10 +27,16 @@ export function extractStreamUrl(downloadUrl) {
 }
 
 // Extract best cover art
-export function extractCover(image) {
-  if (!image?.length) return '';
-  // Prefer highest quality (index 2 = 500x500)
-  return image[2]?.url || image[1]?.url || image[0]?.url || '';
+export function extractCover(image, quality = 'high') {
+  if (!image || !Array.isArray(image)) return '';
+  if (quality === 'high') {
+    // image[2] = 500x500, replace with higher if URL pattern allows
+    const base = image[2]?.url || image[1]?.url || image[0]?.url || '';
+    // JioSaavn URLs mein 150x150 → 500x500 already image[2] hai
+    // Aur 500x500 → 1000x1000 bhi try kar sakte hain
+    return base.replace('150x150', '500x500').replace('50x50', '500x500');
+  }
+  return image[1]?.url || image[0]?.url || '';
 }
 
 // Decode HTML entities in titles
@@ -167,20 +173,17 @@ export async function getPlaylist(id) {
 
 export async function getTrending(lang = 'hindi') {
   try {
-    const results = await searchSongs(`trending ${lang} songs 2024`, 20);
+    const results = await searchSongs(`trending ${lang} songs ${new Date().getFullYear()}`, 20);
     return results;
   } catch {
     return [];
   }
 }
 
-export async function searchAll(query) {
-  return fetchWithFallback(`/search?query=${encodeURIComponent(query)}`);
-}
 
 // ── Smart Recommendations ─────────────────────────────────────────────────────
 // Picks top artists from liked songs & recently played, fetches more of their music.
-export async function getRecommendations(likedSongObjects = [], recentlyPlayedSongs = []) {
+export async function getRecommendations(likedSongObjects = [], recentlyPlayedSongs = [], skippedSongs = {}) {
   try {
     // Count artist frequency across liked + recent
     const artistCount = {};
@@ -211,11 +214,18 @@ export async function getRecommendations(likedSongObjects = [], recentlyPlayedSo
 
     // Flatten, deduplicate, filter out already-known songs
     const seen = new Set();
-    return results.flat().filter(song => {
+    const allResults = results.flat().filter(song => {
       if (!song || seen.has(song.id) || knownIds.has(song.id)) return false;
       seen.add(song.id);
       return true;
-    }).slice(0, 15);
+    });
+
+    // 3+ baar skip hue songs ko hata do
+    const SKIP_THRESHOLD = 3;
+    const filtered = allResults.filter(song =>
+      (skippedSongs[song.id] || 0) < SKIP_THRESHOLD
+    );
+    return filtered.slice(0, 15);
   } catch {
     return [];
   }
@@ -305,5 +315,22 @@ export async function getHiddenGems(likedSongObjects = [], recentlyPlayedSongs =
     }).slice(0, 15);
   } catch {
     return [];
+  }
+}
+
+export async function getLyrics(songId) {
+  try {
+    const json = await fetchWithFallback(`/songs/${songId}/lyrics`);
+    const raw = json?.data?.lyrics || json?.lyrics || '';
+    if (!raw) return null;
+    // Lines mein tod do, empty lines hata do
+    return raw
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+  } catch {
+    return null;
   }
 }

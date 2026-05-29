@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import usePlayerStore from '../store/playerStore';
 
 export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPlaylist }) {
+  const navigate = useNavigate();
+  const playNext = usePlayerStore(s => s.playNext);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const formatTime = (secs) => {
     if (!secs || isNaN(secs)) return '—';
     const m = Math.floor(secs / 60);
@@ -45,7 +51,12 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
         <h4 className={`text-sm font-semibold truncate leading-tight ${isActive ? 'text-[#1DB954]' : 'text-white'}`}>
           {song.title}
         </h4>
-        <p className="text-xs text-white/50 truncate mt-0.5">{song.artist}</p>
+        <p
+          className="text-xs text-white/50 truncate mt-0.5 cursor-pointer hover:underline"
+          onClick={(e) => { e.stopPropagation(); navigate(`/artist/${encodeURIComponent(song.artist?.split(',')[0]?.trim())}`); }}
+        >
+          {song.artist}
+        </p>
       </div>
 
       {/* Duration + add */}
@@ -62,6 +73,57 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
             </svg>
           </button>
         )}
+        
+        {/* 3-dot menu */}
+        <div style={{ position: 'relative', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, color: 'rgba(255,255,255,0.4)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+            </svg>
+          </button>
+
+          {menuOpen && (
+            <>
+              {/* Backdrop */}
+              <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setMenuOpen(false)} />
+              {/* Menu */}
+              <div style={{
+                position: 'absolute', right: 0, top: '100%', zIndex: 100,
+                background: '#282828', borderRadius: 10, overflow: 'hidden',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6)', minWidth: 160,
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+                <button
+                  onClick={() => { playNext(song); setMenuOpen(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 14, fontFamily: 'inherit' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <polygon points="5,3 19,12 5,21"/><line x1="19" y1="3" x2="19" y2="21"/>
+                  </svg>
+                  Play next
+                </button>
+                <button
+                  onClick={() => {
+                    const queue = usePlayerStore.getState().queue;
+                    usePlayerStore.setState({ queue: [...queue, song] });
+                    setMenuOpen(false);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, fontFamily: 'inherit' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+                    <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+                    <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                  </svg>
+                  Add to queue
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

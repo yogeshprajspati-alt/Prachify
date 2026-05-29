@@ -6,12 +6,14 @@ export function updateMediaSession(song) {
   if (!('mediaSession' in navigator)) return;
 
   navigator.mediaSession.metadata = new MediaMetadata({
-    title: song.title,
-    artist: song.artist,
-    album: 'Prachify',
+    title: song.title || 'Unknown',
+    artist: song.artist || 'Unknown',
+    album: song.album || '',
     artwork: [
+      // Multiple sizes provide karo — browser best choose karega
       { src: song.cover, sizes: '512x512', type: 'image/jpeg' },
-      { src: song.cover, sizes: '256x256', type: 'image/jpeg' },
+      { src: song.cover?.replace('150x150', '500x500') || song.cover, sizes: '256x256', type: 'image/jpeg' },
+      { src: song.cover, sizes: '96x96', type: 'image/jpeg' },
     ],
   });
 }

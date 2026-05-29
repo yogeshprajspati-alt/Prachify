@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import playlistData from '../data/playlist.json';
 import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists } from '../services/db';
+import { generatePlaylistCover } from '../utils/generatePlaylistCover';
 
 function buildAllSongs(playlists) {
   return playlists.flatMap(pl =>
@@ -30,33 +31,53 @@ const usePlayerStore = create(
       position: 0,
       isLoading: false,
       hasError: false,
+      smartQueueEnabled: true,
+      radioSeeds: [],
 
       // ── Modes ─────────────────────────────────────────────────────────────
       shuffle: false,
       repeatMode: 'off',   // 'off' | 'all' | 'one'
       volume: 1.0,
       isMuted: false,
+      playbackRate: 1.0,
+      abLoop: { active: false, a: null, b: null },
 
       // ── Persistence ───────────────────────────────────────────────────────
       recentSongs: [],
       likedSongs: [],       // song ids
       likedSongObjects: [], // full song objects (for JioSaavn songs)
-
-      // ── Search ────────────────────────────────────────────────────────────
-      searchResults: [],
-      isSearching: false,
-      searchQuery: '',
+      skippedSongs: {},     // { songId: skipCount }
 
       // ── Setters ───────────────────────────────────────────────────────────
       setCurrentSong: (song) => {
-        set({ currentSong: song, isLoading: true, hasError: false, position: 0 });
-        // Update recent
-        const prev = get().recentSongs.filter(id => id !== song.id);
-        set({ recentSongs: [song.id, ...prev].slice(0, 30) });
+        set({ 
+          currentSong: song, 
+          isLoading: true, 
+          hasError: false, 
+          position: 0,
+          abLoop: { active: false, a: null, b: null }
+        });
+        
+        // Add to recents
+        if (song) {
+          const s = get();
+          const filtered = s.recentSongs.filter(id => id !== song.id);
+          set({ recentSongs: [song.id, ...filtered].slice(0, 30) });
+        }
+
         // Cache jio songs
-        if (song.source === 'jiosaavn') {
+        if (song?.source === 'jiosaavn') {
           set(s => ({ jiosaavnCache: { ...s.jiosaavnCache, [song.id]: song } }));
         }
+      },
+      recordSkip: (songId) => {
+        if (!songId) return;
+        set(s => ({
+          skippedSongs: {
+            ...s.skippedSongs,
+            [songId]: (s.skippedSongs[songId] || 0) + 1,
+          },
+        }));
       },
       setQueue: (songs, startIndex = 0, playlistId = null) =>
         set({ queue: songs, queueIndex: startIndex, currentPlaylistId: playlistId }),
@@ -77,6 +98,23 @@ const usePlayerStore = create(
         const cur = get().repeatMode;
         set({ repeatMode: modes[(modes.indexOf(cur) + 1) % modes.length] });
       },
+      toggleSmartQueue: () => set(s => ({ smartQueueEnabled: !s.smartQueueEnabled })),
+      setRadioSeeds: (songs) => set({ radioSeeds: songs }),
+      setPlaybackRate: (rate) => set({ playbackRate: rate }),
+      
+      setAbPoint: (point) => set(s => {
+        const { a, b } = s.abLoop;
+        if (point === 'a' || (point === 'auto' && a === null)) {
+          return { abLoop: { active: false, a: s.position, b: null } };
+        }
+        if (point === 'b' || (point === 'auto' && a !== null && b === null)) {
+          const newB = s.position;
+          if (newB <= a) return s;
+          return { abLoop: { active: true, a, b: newB } };
+        }
+        return { abLoop: { active: false, a: null, b: null } };
+      }),
+      resetAbLoop: () => set({ abLoop: { active: false, a: null, b: null } }),
 
       // ── Navigation ────────────────────────────────────────────────────────
       nextSong: () => {
@@ -198,7 +236,24 @@ const usePlayerStore = create(
         deletePlaylistFromDB(id);
       },
 
-      addSongToPlaylist: (playlistId, song) => {
+      // Queue mein current position ke baad song add karo
+      playNext: (song) => {
+        const { queue, queueIndex } = get();
+        if (!queue.length) {
+          // Queue empty hai — directly play karo
+          set({ queue: [song], queueIndex: 0 });
+          return;
+        }
+        const insertAt = queueIndex + 1;
+        const newQueue = [
+          ...queue.slice(0, insertAt),
+          song,
+          ...queue.slice(insertAt),
+        ];
+        set({ queue: newQueue });
+      },
+
+      addSongToPlaylist: async (playlistId, song) => {
         set(s => {
           const updated = s.customPlaylists.map(pl => {
             if (pl.id !== playlistId) return pl;
@@ -209,6 +264,21 @@ const usePlayerStore = create(
           if (pl) syncPlaylist(pl);
           return { customPlaylists: updated };
         });
+
+        // Cover auto-update karo agar pehle 4 songs mein se hai
+        const pl = get().customPlaylists.find(p => p.id === playlistId);
+        if (!pl) return;
+        const first4 = pl.songs.slice(0, 4).map(s => s.cover).filter(Boolean);
+        if (first4.length >= 2) {
+          const newCover = await generatePlaylistCover(first4);
+          if (newCover) {
+            set(s => ({
+              customPlaylists: s.customPlaylists.map(p =>
+                p.id === playlistId ? { ...p, cover: newCover } : p
+              ),
+            }));
+          }
+        }
       },
 
       removeSongFromPlaylist: (playlistId, songId) => {
@@ -295,11 +365,6 @@ const usePlayerStore = create(
           || null;
       },
 
-      // ── Search state ──────────────────────────────────────────────────────
-      setSearchResults: results => set({ searchResults: results }),
-      setIsSearching: val => set({ isSearching: val }),
-      setSearchQuery: q => set({ searchQuery: q }),
-
       // ── Add to playlist modal ─────────────────────────────────────────────
       addToPlaylistSong: null,
       setAddToPlaylistSong: song => set({ addToPlaylistSong: song }),
@@ -315,12 +380,20 @@ const usePlayerStore = create(
         recentSongs: s.recentSongs,
         likedSongs: s.likedSongs,
         likedSongObjects: s.likedSongObjects,
+        skippedSongs: s.skippedSongs,
         customPlaylists: s.customPlaylists,
         shuffle: s.shuffle,
         repeatMode: s.repeatMode,
+        smartQueueEnabled: s.smartQueueEnabled,
         volume: s.volume,
         isMuted: s.isMuted,
-        jiosaavnCache: s.jiosaavnCache,
+        playbackRate: s.playbackRate,
+        jiosaavnCache: (() => {
+          const entries = Object.entries(s.jiosaavnCache);
+          return entries.length > 100
+            ? Object.fromEntries(entries.slice(-100))
+            : s.jiosaavnCache;
+        })(),
       }),
     }
   )

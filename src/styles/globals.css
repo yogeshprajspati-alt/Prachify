@@ -77,3 +77,18 @@ button, a { outline: none; }
   overflow-y: auto;
   padding-bottom: 140px;
 }
+
+/* Skeleton shimmer animation */
+@keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
+.shimmer { animation: shimmer 1.4s ease-in-out infinite; }
+
+/* Offline banner entrance */
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes lyricFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
