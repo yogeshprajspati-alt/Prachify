@@ -83,6 +83,8 @@ export default function FullscreenPlayer({
   const setAbPoint = usePlayerStore(s => s.setAbPoint);
   const resetAbLoop = usePlayerStore(s => s.resetAbLoop);
   const setAddToPlaylistSong = usePlayerStore(s => s.setAddToPlaylistSong);
+  const removeFromQueue = usePlayerStore(s => s.removeFromQueue);
+  const addToQueue = usePlayerStore(s => s.addToQueue);
   const isLiked = likedSongs.includes(song?.id);
 
   const [suggestions, setSuggestions] = useState([]);
@@ -371,11 +373,33 @@ export default function FullscreenPlayer({
                 }
               </button>
 
-              <button onClick={onNext} style={ctrl}>
-                <svg width="34" height="34" viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)">
-                  <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-                </svg>
-              </button>
+              {/* Next Button */}
+              {(() => {
+                const isLastInQueue = queue.length > 0 && queueIndex >= queue.length - 1;
+                const willRepeat = repeatMode === 'all' || repeatMode === 'one';
+                const isAutoRadioNext = isLastInQueue && smartQueueEnabled && !willRepeat;
+                const isEnd = isLastInQueue && !smartQueueEnabled && !willRepeat;
+                
+                return (
+                  <button 
+                    onClick={isEnd ? undefined : onNext} 
+                    style={{
+                      ...ctrl,
+                      opacity: isEnd ? 0.3 : 1,
+                      cursor: isEnd ? 'default' : 'pointer',
+                      transform: isAutoRadioNext ? 'scale(1.1)' : 'scale(1)',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill={isAutoRadioNext ? '#1DB954' : 'rgba(255,255,255,0.9)'} style={{ filter: isAutoRadioNext ? 'drop-shadow(0 0 8px rgba(29,185,84,0.6))' : 'none', transition: 'all 0.3s ease' }}>
+                      <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                    </svg>
+                    {isAutoRadioNext && (
+                      <span style={{ position: 'absolute', top: 0, right: 0, fontSize: 12, filter: 'drop-shadow(0 0 4px #1DB954)' }}>✨</span>
+                    )}
+                  </button>
+                );
+              })()}
 
               <button onClick={onCycleRepeat} style={{ ...ctrl, position: 'relative' }}>
                 {repeatMode === 'one'
@@ -507,13 +531,33 @@ export default function FullscreenPlayer({
                     border: isCur ? '1px solid rgba(29,185,84,0.25)' : '1px solid transparent',
                     borderRadius: 12, cursor: 'pointer', padding: '10px 12px',
                     textAlign: 'left', marginBottom: 6, transition: 'background 0.15s',
+                    position: 'relative',
                   }}>
                   <img src={item.cover} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} onError={e => e.target.style.background = '#333'} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: isCur ? '#1DB954' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{item.artist}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.artist}</div>
                   </div>
-                  {isCur && isPlaying && <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 16 }}><span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" /></div>}
+                  {isCur && isPlaying && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 16, flexShrink: 0 }}>
+                      <span className="eq-bar" /><span className="eq-bar" /><span className="eq-bar" />
+                    </div>
+                  )}
+                  {!isCur && (
+                    <button
+                      onClick={e => { e.stopPropagation(); removeFromQueue(i); }}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'rgba(255,255,255,0.2)', padding: '4px 6px',
+                        fontSize: 16, lineHeight: 1, flexShrink: 0,
+                        transition: 'color 0.15s',
+                      }}
+                      onMouseOver={e => e.currentTarget.style.color = 'rgba(255,100,100,0.8)'}
+                      onMouseOut={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </button>
               );
             })}
@@ -591,12 +635,11 @@ export default function FullscreenPlayer({
               related.map(item => (
                 <button
                   key={item.id}
-                  onClick={() => onPlaySuggestion?.(item)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, width: '100%',
                     background: 'rgba(255,255,255,0.03)',
                     border: '1px solid transparent',
-                    borderRadius: 12, cursor: 'pointer', padding: '10px 12px',
+                    borderRadius: 12, cursor: 'default', padding: '10px 12px',
                     textAlign: 'left', marginBottom: 6,
                     transition: 'background 0.15s',
                     fontFamily: 'inherit',
@@ -609,9 +652,30 @@ export default function FullscreenPlayer({
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
                     <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.artist}</div>
                   </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="rgba(255,255,255,0.25)">
-                    <polygon points="5,3 19,12 5,21" />
-                  </svg>
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); addToQueue(item); }}
+                      title="Add to queue"
+                      style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '6px 8px', color: 'rgba(255,255,255,0.5)', transition: 'background 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); onPlaySuggestion?.(item); }}
+                      title="Play now"
+                      style={{ background: 'rgba(29,185,84,0.1)', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '6px 8px', color: '#1DB954', transition: 'background 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(29,185,84,0.2)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(29,185,84,0.1)'}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5,3 19,12 5,21"/>
+                      </svg>
+                    </button>
+                  </div>
                 </button>
               ))
             )}

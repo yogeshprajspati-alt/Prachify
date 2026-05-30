@@ -5,6 +5,7 @@ import usePlayerStore from '../store/playerStore';
 export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPlaylist }) {
   const navigate = useNavigate();
   const playNext = usePlayerStore(s => s.playNext);
+  const addToQueue = usePlayerStore(s => s.addToQueue);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const formatTime = (secs) => {
@@ -106,11 +107,7 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
                   Play next
                 </button>
                 <button
-                  onClick={() => {
-                    const queue = usePlayerStore.getState().queue;
-                    usePlayerStore.setState({ queue: [...queue, song] });
-                    setMenuOpen(false);
-                  }}
+                  onClick={() => { addToQueue(song); setMenuOpen(false); }}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, fontFamily: 'inherit' }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -120,6 +117,17 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
                   </svg>
                   Add to queue
                 </button>
+                {onAddToPlaylist && (
+                  <button
+                    onClick={() => { onAddToPlaylist(song); setMenuOpen(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)', fontSize: 14, fontFamily: 'inherit' }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    Add to playlist
+                  </button>
+                )}
               </div>
             </>
           )}

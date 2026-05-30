@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import { searchSongs } from '../services/jiosaavn';
+import SongRow from '../components/SongRow';
 
 const CATEGORIES = [
   { label: 'Arijit Singh', color: '#1e3264', query: 'arijit singh hits' },
@@ -180,45 +181,17 @@ export default function Search() {
           <div style={{ fontSize: 12, color: '#727272', fontWeight: 600, marginBottom: 12 }}>
             {results.length} results for "{query}"
           </div>
-          {results.map((song) => {
-            const active = currentSong?.id === song.id;
-            return (
-              <div key={song.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderRadius: 6, cursor: 'pointer' }}
-                onClick={() => handlePlay(song)}>
-                {/* Cover */}
-                <div style={{ position: 'relative', width: 50, height: 50, flexShrink: 0, borderRadius: 4, overflow: 'hidden', background: '#282828' }}>
-                  {song.cover && (
-                    <img src={song.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={e => { e.target.style.display = 'none'; }} />
-                  )}
-                  {active && isPlaying && (
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: 6, gap: 2 }}>
-                      <span className="eq-bar"/><span className="eq-bar"/><span className="eq-bar"/>
-                    </div>
-                  )}
-                </div>
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: active ? '#1DB954' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
-                    {song.title}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#b3b3b3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {song.artist}
-                    {song.album && ` · ${song.album}`}
-                  </div>
-                </div>
-                {/* Duration */}
-                <span style={{ fontSize: 12, color: '#727272', flexShrink: 0 }}>{formatDur(song.duration)}</span>
-                {/* Add to playlist */}
-                <button onClick={e => { e.stopPropagation(); setAddToPlaylistSong(song); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px', flexShrink: 0 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#727272" strokeWidth="2" strokeLinecap="round">
-                    <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+          {results.map((song) => (
+            <div key={song.id} style={{ margin: '0 -8px' }}>
+              <SongRow
+                song={song}
+                isActive={currentSong?.id === song.id}
+                isPlaying={isPlaying}
+                onClick={() => handlePlay(song)}
+                onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
+              />
+            </div>
+          ))}
         </div>
       )}
 

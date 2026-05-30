@@ -171,9 +171,19 @@ export async function getPlaylist(id) {
   };
 }
 
+const TRENDING_QUERIES = [
+  'trending hindi songs 2025',
+  'top bollywood hits 2025',
+  'new hindi songs this week',
+  'viral songs india 2025',
+  'latest bollywood 2025',
+  'popular hindi songs now',
+];
+
 export async function getTrending(lang = 'hindi') {
   try {
-    const results = await searchSongs(`trending ${lang} songs ${new Date().getFullYear()}`, 20);
+    const query = TRENDING_QUERIES[Math.floor(Math.random() * TRENDING_QUERIES.length)];
+    const results = await searchSongs(query, 20);
     return results;
   } catch {
     return [];
@@ -287,13 +297,15 @@ export async function getDailyMix(likedSongObjects = []) {
 // ── Hidden Gems ───────────────────────────────────────────────────────────────
 // Searches niche/underplayed queries and filters out songs the user already knows.
 export async function getHiddenGems(likedSongObjects = [], recentlyPlayedSongs = []) {
-  const nicheQueries = [
-    'indie hindi underrated 2023',
-    'underground punjabi new',
-    'lesser known bollywood gems',
-    'hidden hindi songs 2022',
-    'indie pop india 2024',
-    'underrated romantic hindi',
+  const GEM_QUERIES = [
+    'underrated hindi songs',
+    'indie hindi music',
+    'hidden gems bollywood',
+    'lesser known hindi hits',
+    'underground hindi artists',
+    'unpopular bollywood songs',
+    'folk fusion hindi',
+    'indie pop india',
   ];
 
   try {
@@ -301,14 +313,11 @@ export async function getHiddenGems(likedSongObjects = [], recentlyPlayedSongs =
       [...likedSongObjects, ...recentlyPlayedSongs].map(s => s?.id).filter(Boolean)
     );
 
-    // Pick 3 random niche queries so it feels different each session
-    const picked = nicheQueries.sort(() => Math.random() - 0.5).slice(0, 3);
-    const results = await Promise.all(
-      picked.map(q => searchSongs(q, 10).catch(() => []))
-    );
+    const query = GEM_QUERIES[Math.floor(Math.random() * GEM_QUERIES.length)];
+    const results = await searchSongs(query, 20);
 
     const seen = new Set();
-    return results.flat().filter(song => {
+    return results.filter(song => {
       if (!song || seen.has(song.id) || knownIds.has(song.id)) return false;
       seen.add(song.id);
       return true;

@@ -236,7 +236,6 @@ const usePlayerStore = create(
         deletePlaylistFromDB(id);
       },
 
-      // Queue mein current position ke baad song add karo
       playNext: (song) => {
         const { queue, queueIndex } = get();
         if (!queue.length) {
@@ -251,6 +250,25 @@ const usePlayerStore = create(
           ...queue.slice(insertAt),
         ];
         set({ queue: newQueue });
+      },
+
+      addToQueue: (song) => {
+        const { queue } = get();
+        // Already queue mein hai to skip karo
+        if (queue.some(s => s.id === song.id)) return;
+        set({ queue: [...queue, song] });
+      },
+
+      removeFromQueue: (index) => {
+        const { queue, queueIndex } = get();
+        if (index < 0 || index >= queue.length) return;
+        // Currently playing song ko mat hatao
+        if (index === queueIndex) return;
+
+        const newQueue = queue.filter((_, i) => i !== index);
+        // agar removed item current se pehle tha to index adjust karo
+        const newIndex = index < queueIndex ? queueIndex - 1 : queueIndex;
+        set({ queue: newQueue, queueIndex: newIndex });
       },
 
       addSongToPlaylist: async (playlistId, song) => {

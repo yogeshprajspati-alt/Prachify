@@ -5,8 +5,17 @@ import usePlayerStore from '../store/playerStore';
 import { getTrending, getRecommendations, getDailyMix, getHiddenGems } from '../services/jiosaavn';
 import { SongScroll, SkeletonRow } from '../components/SongScroll';
 
-// Module-level cache — survives navigation (trending, recs, gems)
+const CACHE_TTL = 30 * 60 * 1000;
 const _homeCache = {};
+
+function getHome(key) {
+  const e = _homeCache[key];
+  if (!e || Date.now() - e.time > CACHE_TTL) return null;
+  return e.data;
+}
+function setHome(key, data) {
+  _homeCache[key] = { data, time: Date.now() };
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -43,28 +52,48 @@ export default function Home() {
     if (fetched.current) return;
     fetched.current = true;
 
-    // Serve from module-level cache when navigating back
-    if (_homeCache.trending) { setTrending(_homeCache.trending); }
-    else { getTrending().then(s => { const t = s.slice(0, 10); _homeCache.trending = t; setTrending(t); }).catch(() => {}); }
+    // Trending:
+    const cachedTrending = getHome('trending');
+    if (cachedTrending) {
+      setTrending(cachedTrending);
+    } else {
+      getTrending().then(s => {
+        const sliced = s.slice(0, 10);
+        setHome('trending', sliced);
+        setTrending(sliced);
+      }).catch(() => {});
+    }
 
-    if (_homeCache.recommendations) { setRecommendations(_homeCache.recommendations); setLoadingRecs(false); }
-    else {
+    // Recommendations:
+    const cachedRecs = getHome('recommendations');
+    if (cachedRecs) {
+      setRecommendations(cachedRecs);
+      setLoadingRecs(false);
+    } else {
       getRecommendations(likedSongObjects, recentObjects, skippedSongs)
-        .then(r => { _homeCache.recommendations = r; setRecommendations(r); })
+        .then(r => { setHome('recommendations', r); setRecommendations(r); })
         .finally(() => setLoadingRecs(false));
     }
 
-    if (_homeCache.dailyMix) { setDailyMix(_homeCache.dailyMix); setLoadingMix(false); }
-    else {
+    // Daily Mix:
+    const cachedMix = getHome('dailyMix');
+    if (cachedMix) {
+      setDailyMix(cachedMix);
+      setLoadingMix(false);
+    } else {
       getDailyMix(likedSongObjects)
-        .then(m => { _homeCache.dailyMix = m; setDailyMix(m); })
+        .then(m => { setHome('dailyMix', m); setDailyMix(m); })
         .finally(() => setLoadingMix(false));
     }
 
-    if (_homeCache.hiddenGems) { setHiddenGems(_homeCache.hiddenGems); setLoadingGems(false); }
-    else {
+    // Gems:
+    const cachedGems = getHome('gems');
+    if (cachedGems) {
+      setHiddenGems(cachedGems);
+      setLoadingGems(false);
+    } else {
       getHiddenGems(likedSongObjects, recentObjects)
-        .then(g => { _homeCache.hiddenGems = g; setHiddenGems(g); })
+        .then(g => { setHome('gems', g); setHiddenGems(g); })
         .finally(() => setLoadingGems(false));
     }
   }, []);  // eslint-disable-line
