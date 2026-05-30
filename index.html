@@ -30,36 +30,80 @@
 
 <body class="bg-[#0B0B0F]">
   <div id="root">
-    <!-- Premium Spotify-inspired loading splash loader -->
-    <div
-      style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0B0B0F; gap: 24px; font-family: 'Inter', sans-serif; color: #FFFFFF; z-index: 9999;">
-      <!-- Pulsing Spotify-style waves logo -->
-      <svg viewBox="0 0 24 24"
-        style="width: 80px; height: 80px; animation: spotifyPulse 1.8s ease-in-out infinite; cursor: default;">
-        <defs>
-          <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF7EB6" />
-            <stop offset="100%" stopColor="#9D7CFF" />
-          </linearGradient>
-        </defs>
-        <!-- Outer circle -->
-        <circle cx="12" cy="12" r="10" fill="none" stroke="url(#logoGrad)" strokeWidth="1.8" />
-        <!-- Inner soundwaves -->
-        <path d="M8.5 9.5c2.3-1 4.7-1 7 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.5"
-          strokeLinecap="round" />
-        <path d="M7.3 12c3.1-1.3 6.3-1.3 9.4 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.6"
-          strokeLinecap="round" />
-        <path d="M6.5 14.5c3.6-1.5 7.4-1.5 11 0" fill="none" stroke="url(#logoGrad)" strokeWidth="1.7"
-          strokeLinecap="round" />
-      </svg>
+    <div id="splash" style="
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0B0B0F;
+      z-index: 9999;
+      gap: 28px;
+      font-family: 'Inter', sans-serif;
+    ">
+      <!-- Logo -->
+      <div style="
+        animation: splashLogoIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        filter: drop-shadow(0 0 32px rgba(200, 100, 255, 0.5));
+      ">
+        <img
+          src="/prachify-logo.png"
+          alt="Prachify"
+          style="width: 120px; height: 120px; object-fit: contain;"
+        />
+      </div>
 
-      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;">
-        <h1
-          style="font-size: 26px; font-weight: 800; margin: 0; background: linear-gradient(135deg, #FF7EB6, #9D7CFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.8px;">
-          Prachify</h1>
-        <p
-          style="font-size: 9px; color: #60607A; text-transform: uppercase; letter-spacing: 3px; font-weight: 600; margin: 0;">
-          for when the world is quiet</p>
+      <!-- App name + tagline -->
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        animation: splashTextIn 0.7s ease both;
+        animation-delay: 0.35s;
+        opacity: 0;
+      ">
+        <h1 style="
+          font-size: 28px;
+          font-weight: 800;
+          margin: 0;
+          background: linear-gradient(135deg, #FF7EB6, #9D7CFF);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          letter-spacing: -0.5px;
+        ">Prachify</h1>
+        <p style="
+          font-size: 10px;
+          color: #50506A;
+          text-transform: uppercase;
+          letter-spacing: 3.5px;
+          font-weight: 600;
+          margin: 0;
+        ">for when the world is quiet</p>
+      </div>
+
+      <!-- Bottom loading bar -->
+      <div style="
+        position: absolute;
+        bottom: 48px;
+        width: 48px;
+        height: 2px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 2px;
+        overflow: hidden;
+        animation: splashBarIn 0.4s ease both;
+        animation-delay: 0.6s;
+        opacity: 0;
+      ">
+        <div style="
+          height: 100%;
+          background: linear-gradient(90deg, #FF7EB6, #9D7CFF);
+          border-radius: 2px;
+          animation: splashBarFill 1.2s ease both;
+          animation-delay: 0.7s;
+        "></div>
       </div>
     </div>
   </div>
@@ -67,22 +111,51 @@
   <script type="module" src="/src/main.jsx"></script>
 
   <style>
-    @keyframes spotifyPulse {
-
-      0%,
-      100% {
-        transform: scale(0.96);
-        opacity: 0.8;
-        filter: drop-shadow(0 0 12px rgba(255, 126, 182, 0.25));
+    @keyframes splashLogoIn {
+      from {
+        opacity: 0;
+        transform: scale(0.7);
+        filter: drop-shadow(0 0 0px rgba(200, 100, 255, 0));
       }
-
-      50% {
-        transform: scale(1.03);
+      to {
         opacity: 1;
-        filter: drop-shadow(0 0 28px rgba(255, 126, 182, 0.6));
+        transform: scale(1);
+        filter: drop-shadow(0 0 32px rgba(200, 100, 255, 0.5));
       }
     }
+
+    @keyframes splashTextIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes splashBarIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes splashBarFill {
+      from { width: 0%; }
+      to   { width: 100%; }
+    }
+
+    /* Neon glow pulse — logo pe subtle breathing effect */
+    @keyframes splashGlow {
+      0%, 100% { filter: drop-shadow(0 0 24px rgba(200, 100, 255, 0.4)); }
+      50%       { filter: drop-shadow(0 0 48px rgba(255, 126, 182, 0.7)); }
+    }
   </style>
+  <script>
+    // Logo load hone ke baad glow pulse start karo
+    window.addEventListener('load', function() {
+      const logoDiv = document.querySelector('#splash > div:first-child');
+      if (logoDiv) {
+        setTimeout(() => {
+          logoDiv.style.animation = 'splashGlow 2s ease-in-out infinite';
+        }, 900); // initial animation khatam hone ke baad
+      }
+    });
+  </script>
 </body>
 
 </html>
