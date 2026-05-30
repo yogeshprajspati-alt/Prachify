@@ -132,23 +132,25 @@ export default function HannahChat() {
       <div style={{ padding: '12px 16px', background: '#181818', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
         
         {/* Quick Prompts */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
-          {["Explain the A-B Loop", "Who created you?", "How does Smart Queue work?"].map(p => (
-            <button
-              key={p}
-              onClick={() => handleSend(p)}
-              style={{
-                background: '#282828', border: 'none', borderRadius: 20, padding: '8px 14px',
-                color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#3e3e3e'}
-              onMouseLeave={e => e.currentTarget.style.background = '#282828'}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        {messages.length < 3 && (
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' }}>
+            {["Explain the A-B Loop", "Who created you?", "How does Smart Queue work?", "What can you do?", "How to use Karaoke?", "Who is Prachi?"].sort(() => 0.5 - Math.random()).slice(0, 3).map(p => (
+              <button
+                key={p}
+                onClick={() => handleSend(p)}
+                style={{
+                  background: '#282828', border: 'none', borderRadius: 20, padding: '8px 14px',
+                  color: '#fff', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#3e3e3e'}
+                onMouseLeave={e => e.currentTarget.style.background = '#282828'}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Input Field */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
