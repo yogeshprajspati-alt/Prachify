@@ -18,32 +18,29 @@ export function usePlayerEngine() {
   }, [playbackRate]);
 
   const startPositionTick = useCallback(() => {
-    let last = 0;
-    const tick = (ts) => {
-      if (ts - last > 200) { // ~5fps — seek bar doesn't need 60fps
-        last = ts;
-        const pos = audio.getPosition();
-        const dur = audio.getDuration();
-        store.setPosition(pos);
+    // Use setInterval instead of requestAnimationFrame so the ticker keeps
+    // running when the screen is turned off (rAF is paused by the OS/browser
+    // in background/screen-off state which causes next-song logic to break).
+    clearInterval(positionRaf.current);
+    positionRaf.current = setInterval(() => {
+      const pos = audio.getPosition();
+      const dur = audio.getDuration();
+      store.setPosition(pos);
 
-        // A-B loop check
-        const { abLoop } = usePlayerStore.getState();
-        if (abLoop.active && abLoop.a !== null && abLoop.b !== null) {
-          if (pos >= abLoop.b) {
-            audio.seek(abLoop.a);
-          }
+      // A-B loop check
+      const { abLoop } = usePlayerStore.getState();
+      if (abLoop.active && abLoop.a !== null && abLoop.b !== null) {
+        if (pos >= abLoop.b) {
+          audio.seek(abLoop.a);
         }
-
-        if (dur > 0) setMediaSessionState('playing', pos, dur);
       }
-      positionRaf.current = requestAnimationFrame(tick);
-    };
-    cancelAnimationFrame(positionRaf.current);
-    positionRaf.current = requestAnimationFrame(tick);
+
+      if (dur > 0) setMediaSessionState('playing', pos, dur);
+    }, 500); // 500ms is plenty for the seek bar and doesn't waste battery
   }, [store]);
 
   const stopPositionTick = useCallback(() => {
-    cancelAnimationFrame(positionRaf.current);
+    clearInterval(positionRaf.current);
   }, []);
 
   const playSong = useCallback((song, startPos = 0) => {
@@ -236,14 +233,19 @@ export function usePlayer() {
     audio.setVolume(isMuted ? 0 : volume);
     updateMediaSession(song);
 
-    // Strict 10-second timeout to break out of infinite loading if CDN is blocked
+    // Timeout to break out of infinite loading if CDN is blocked.
+    // Bumped to 15s and also checks !audio.isPlaying() before killing — this
+    // prevents a race where the background-throttled timer fires while the song
+    // has already started playing (which was causing audio to be unloaded mid-song
+    // after turning the screen off).
     setTimeout(() => {
-      if (usePlayerStore.getState().isLoading && usePlayerStore.getState().currentSong?.id === song.id) {
+      const state = usePlayerStore.getState();
+      if (state.isLoading && state.currentSong?.id === song.id && !audio.isPlaying()) {
         audio.unload();
         store.setIsLoading(false);
         store.setHasError(true);
       }
-    }, 10000);
+    }, 15000);
   }, [store]);
 
   const playPlaylist = useCallback((playlist, startIndex = 0) => {
