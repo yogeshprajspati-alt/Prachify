@@ -6,7 +6,7 @@ const useChatStore = create(
     (set) => ({
       isOpen: false,
   messages: [
-    { role: 'model', text: 'Hi! I am Hannah ✨ How can I help you with Prachify today? 💖' }
+    { role: 'model', text: 'Hi! I am Hannah ✨ How can I help you with Geet today? 💖' }
   ],
   isTyping: false,
 
@@ -35,7 +35,7 @@ const useChatStore = create(
   setIsTyping: (isTyping) => set({ isTyping }),
   
   clearChat: () => set({ 
-    messages: [{ role: 'model', text: 'Hi! I am Hannah ✨ How can I help you with Prachify today? 💖' }],
+    messages: [{ role: 'model', text: 'Hi! I am Hannah ✨ How can I help you with Geet today? 💖' }],
     isTyping: false 
   }),
     }),

@@ -62,6 +62,7 @@ export default function BottomPlayer() {
               <img
                 src={currentSong.cover} alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                decoding="async"
                 onError={e => e.target.style.background = '#333'}
               />
             </div>

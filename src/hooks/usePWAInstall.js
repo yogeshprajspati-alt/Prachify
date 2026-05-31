@@ -26,10 +26,10 @@ export function usePWAInstall() {
       setCanInstall(true);
 
       // Show modal after a short delay (don't be pushy on first load)
-      const hasShownPrompt = localStorage.getItem('prachify-install-prompted');
+      const hasShownPrompt = localStorage.getItem('geet-install-prompted');
       if (!hasShownPrompt) {
         setTimeout(() => setShowModal(true), 3000);
-        localStorage.setItem('prachify-install-prompted', '1');
+        localStorage.setItem('geet-install-prompted', '1');
       }
     };
 

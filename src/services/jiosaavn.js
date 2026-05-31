@@ -245,7 +245,7 @@ export async function getRecommendations(likedSongObjects = [], recentlyPlayedSo
 // Generates a fresh mix every day based on liked artists. Cached in localStorage.
 export async function getDailyMix(likedSongObjects = []) {
   const today = new Date().toISOString().slice(0, 10); // "2026-05-29"
-  const cacheKey = `prachify_daily_mix_${today}`;
+  const cacheKey = `geet_daily_mix_${today}`;
 
   // Return cached mix if it already exists for today
   try {

@@ -27,74 +27,120 @@ function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// ── Language filter — sirf Hindi, Punjabi, English chahiye ──
+// Tamil, Bhojpuri, Nagpuri, Haryanvi, Telugu etc. bahar!
+const ALLOWED_LANGUAGES = ['hindi', 'punjabi', 'english'];
+function filterByLanguage(songs) {
+  return songs.filter(song => {
+    if (!song.language) return true; // language field missing = don't drop it
+    return ALLOWED_LANGUAGES.includes(song.language.toLowerCase());
+  });
+}
+
 export default function Explore() {
   const navigate = useNavigate();
   const { currentSong, isPlaying, playSong } = usePlayer();
 
   // ── DEDICATED TO PRACHI (USER EDITABLE) ──
-  const dedicatedSongs = [];
+  // 🎵 Bas song ka naam (aur chahiye toh artist bhi) likho — baaki sab automatic!
+  // Format: "Song Name" ya "Song Name - Artist Name"
+  const dedicatedSongNames = [
+    "Copines x PELIGROSA - skyemane nimphia",
+    "Djobi Djoba - LucasGitanoFamily",
+    "Gulabi Aankhen - Sanam",
+    "Jashn-E-Bahaaraa",
+    "Tum Se Hi",
+    "Kaise Hua",
+    "Sajni",
+    "Gerua",
+    "There's Nothing Holding Me Back - Shawn Mendes",
+    "DJ Michael Double",
+  ];
+
+  const [dedicatedSongs, setDedicatedSongs] = useState([]);
+  const [dedicatedLoading, setDedicatedLoading] = useState(false);
 
   // Explore categories
   const exploreCats = [
     {
       label: 'Romantic 💖', color: '#e8115b',
       queries: [
-        'romantic hindi songs', 'love songs bollywood',
-        'romantic hits arijit', 'pyaar ke gaane', 'dil songs hindi',
+        'romantic hindi songs 2024', 'love songs bollywood arijit singh',
+        'romantic bollywood hits', 'pyaar ke gaane hindi', 'dil songs bollywood',
       ],
     },
     {
       label: 'Party 🎉', color: '#bc5900',
       queries: [
-        'party hits punjabi', 'dance songs bollywood',
-        'party anthem hindi', 'club hits india', 'dj hits 2024',
+        'party songs bollywood 2024', 'dance hits bollywood',
+        'party anthem bollywood', 'dance floor hits hindi', 'bollywood party songs',
       ],
     },
     {
       label: 'Chill ☕', color: '#477d95',
       queries: [
-        'chill lofi hindi', 'relaxing songs bollywood',
-        'soft hindi songs', 'peaceful music india', 'acoustic hindi',
+        'chill lofi hindi', 'relaxing bollywood songs',
+        'soft hindi songs acoustic', 'peaceful bollywood music', 'lo-fi hindi beats',
       ],
     },
     {
       label: '90s Hits 📻', color: '#537aa1',
       queries: [
-        '90s bollywood hits', 'purane gaane hindi',
-        'classic bollywood 90s', 'retro hindi songs', '80s 90s bollywood',
+        '90s bollywood hits hindi', 'purane bollywood gaane',
+        'classic hindi songs 90s', 'retro bollywood songs', '90s hindi evergreen',
       ],
     },
     {
       label: 'Punjabi 🥁', color: '#e8a020',
       queries: [
-        'punjabi hits 2024', 'punjabi songs new',
-        'diljit dosanjh songs', 'ap dhillon songs', 'punjabi pop',
+        'punjabi hits 2024 diljit', 'new punjabi songs 2024',
+        'diljit dosanjh latest', 'ap dhillon songs', 'punjabi pop 2024',
       ],
     },
     {
       label: 'Sad 🌙', color: '#503750',
       queries: [
-        'sad hindi songs', 'emotional bollywood',
-        'heartbreak songs hindi', 'dard songs', 'tanha songs',
+        'sad hindi songs bollywood', 'emotional hindi songs arijit',
+        'heartbreak hindi songs', 'dard bhari shayari songs', 'tanha hindi songs',
       ],
     },
     {
       label: 'Workout 💪', color: '#1DB954',
       queries: [
-        'workout songs hindi', 'gym motivation songs',
-        'high energy bollywood', 'power songs india', 'running songs hindi',
+        'workout songs hindi bollywood', 'gym motivation bollywood',
+        'high energy hindi songs', 'power hindi songs', 'running songs bollywood',
       ],
     },
     {
       label: 'Devotional 🙏', color: '#c9a227',
       queries: [
-        'bhajan songs', 'devotional hindi',
-        'morning prayer songs', 'aarti songs', 'mantra music',
+        'hindi bhajan songs', 'devotional hindi songs',
+        'morning hindi aarti', 'hindi mantra songs', 'bhakti songs hindi',
       ],
     },
   ];
 
   const [catData, setCatData] = useState({});
+
+  // Dedicated songs — search each name and pick top result
+  useEffect(() => {
+    if (dedicatedSongNames.length === 0) return;
+    const cacheKey = `dedicated_${dedicatedSongNames.join('|')}`;
+    const cached = getCached(cacheKey);
+    if (cached) { setDedicatedSongs(cached); return; }
+
+    setDedicatedLoading(true);
+    Promise.all(
+      dedicatedSongNames.map(name =>
+        searchSongs(name, 3).then(results => results[0] || null).catch(() => null)
+      )
+    ).then(results => {
+      const found = results.filter(Boolean);
+      setCached(cacheKey, found);
+      setDedicatedSongs(found);
+      setDedicatedLoading(false);
+    });
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     exploreCats.forEach(cat => {
@@ -108,9 +154,11 @@ export default function Explore() {
         return;
       }
 
-      searchSongs(query, 12).then(songs => {
-        setCached(cacheKey, songs);
-        setCatData(prev => ({ ...prev, [cat.label]: songs }));
+      searchSongs(query, 20).then(songs => {
+        // Sirf Hindi/Punjabi/English chahiye — baaki filter out
+        const filtered = filterByLanguage(songs).slice(0, 12);
+        setCached(cacheKey, filtered);
+        setCatData(prev => ({ ...prev, [cat.label]: filtered }));
       }).catch(() => {});
     });
   }, []); // eslint-disable-line
@@ -128,7 +176,9 @@ export default function Explore() {
           <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: 0 }}>Dedicated to Prachi 💖</h2>
         </div>
         
-        {dedicatedSongs.length > 0 ? (
+        {dedicatedLoading ? (
+          <SkeletonRow />
+        ) : dedicatedSongs.length > 0 ? (
           <SongScroll songs={dedicatedSongs} currentSong={currentSong} isPlaying={isPlaying} onPlay={song => playSong(song, { id: 'dedicated', songs: dedicatedSongs, title: 'Dedicated to Prachi' })} />
         ) : (
           <div style={{ padding: '0 16px' }}>
@@ -136,7 +186,7 @@ export default function Explore() {
               <div style={{ fontSize: 32, marginBottom: 12 }}>💝</div>
               <div style={{ fontSize: 14, color: '#fff', fontWeight: 700, marginBottom: 6 }}>This section is waiting for your songs!</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                Add your special song objects to the <br/><code>dedicatedSongs</code> array in <code>Explore.jsx</code>
+                Open <code>Explore.jsx</code> and add song names to <br/><code>dedicatedSongNames</code> — baaki sab automatic!
               </div>
             </div>
           </div>
@@ -155,9 +205,10 @@ export default function Explore() {
                   onClick={() => {
                     const query = pickRandom(cat.queries);
                     setCatData(prev => ({ ...prev, [cat.label]: null })); // skeleton dikhao
-                    searchSongs(query, 12).then(songs => {
-                      setCached(`${cat.label}_${query}`, songs);
-                      setCatData(prev => ({ ...prev, [cat.label]: songs }));
+                    searchSongs(query, 20).then(songs => {
+                      const filtered = filterByLanguage(songs).slice(0, 12);
+                      setCached(`${cat.label}_${query}`, filtered);
+                      setCatData(prev => ({ ...prev, [cat.label]: filtered }));
                     }).catch(() => {});
                   }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 4, transition: 'color 0.15s' }}

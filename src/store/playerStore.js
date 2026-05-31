@@ -4,13 +4,9 @@ import playlistData from '../data/playlist.json';
 import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists } from '../services/db';
 import { generatePlaylistCover } from '../utils/generatePlaylistCover';
 
-function buildAllSongs(playlists) {
-  return playlists.flatMap(pl =>
-    pl.songs.map(s => ({ ...s, playlistId: pl.id, playlistTitle: pl.title }))
-  );
-}
-
-const localSongs = buildAllSongs(playlistData.playlists);
+// TASK-16: playlist.json is always empty — buildAllSongs was dead computation.
+// Keeping the import for getPlaylistById which still reads playlistData.playlists.
+const localSongs = []; // no local songs currently
 
 const usePlayerStore = create(
   persist(
@@ -65,9 +61,16 @@ const usePlayerStore = create(
           set({ recentSongs: [song.id, ...filtered].slice(0, 30) });
         }
 
-        // Cache jio songs
+        // TASK-13: Cap jiosaavnCache at 100 entries at runtime (not just at persist time)
+        // to prevent unbounded memory growth on long sessions.
         if (song?.source === 'jiosaavn') {
-          set(s => ({ jiosaavnCache: { ...s.jiosaavnCache, [song.id]: song } }));
+          set(s => {
+            const entries = Object.entries(s.jiosaavnCache);
+            const trimmed = entries.length >= 100
+              ? Object.fromEntries(entries.slice(-99))
+              : s.jiosaavnCache;
+            return { jiosaavnCache: { ...trimmed, [song.id]: song } };
+          });
         }
       },
       recordSkip: (songId) => {
@@ -78,6 +81,15 @@ const usePlayerStore = create(
             [songId]: (s.skippedSongs[songId] || 0) + 1,
           },
         }));
+      },
+      // TASK-14: Prune skippedSongs on startup — drop single-skip noise, cap at 200
+      pruneSkippedSongs: () => {
+        set(s => {
+          const filtered = Object.entries(s.skippedSongs)
+            .filter(([, count]) => count >= 2) // only keep genuinely disliked songs
+            .slice(-200);                       // cap total to 200 entries max
+          return { skippedSongs: Object.fromEntries(filtered) };
+        });
       },
       setQueue: (songs, startIndex = 0, playlistId = null) =>
         set({ queue: songs, queueIndex: startIndex, currentPlaylistId: playlistId }),

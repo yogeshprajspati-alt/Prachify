@@ -40,7 +40,6 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // ───────────────────────────────────────────────────────────────────────────────
 
 const ENABLED = !!(SUPABASE_URL && SUPABASE_KEY);
-console.log('[DB] Supabase initialization:', { enabled: ENABLED, url: SUPABASE_URL });
 
 // Since this is a private app for a single user, we hardcode the ID.
 // This ensures every device (PC, phone, tablet) shares the exact same database.

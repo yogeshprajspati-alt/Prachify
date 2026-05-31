@@ -150,7 +150,7 @@ export default function Search() {
         <div style={{ padding: '0 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
             <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #333', borderTop: '2px solid #1DB954', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
-            <span style={{ fontSize: 13, color: '#b3b3b3' }}>Searching Prachify...</span>
+            <span style={{ fontSize: 13, color: '#b3b3b3' }}>Searching Geet...</span>
           </div>
           {[1,2,3,4,5].map(i => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>

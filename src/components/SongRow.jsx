@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
 
-export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPlaylist }) {
+// TASK-07: React.memo — prevents re-renders on every 500ms position tick
+const SongRow = memo(function SongRow({ song, isActive, isPlaying, onClick, onAddToPlaylist }) {
   const navigate = useNavigate();
   const playNext = usePlayerStore(s => s.playNext);
   const addToQueue = usePlayerStore(s => s.addToQueue);
@@ -29,6 +30,7 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
           alt={song.title}
           className="w-full h-full object-cover"
           loading="lazy"
+          decoding="async"
           onError={(e) => { e.target.style.display='none'; e.target.parentNode.style.background='#282828'; }}
         />
         {/* Play overlay on hover */}
@@ -135,4 +137,6 @@ export default function SongRow({ song, isActive, isPlaying, onClick, onAddToPla
       </div>
     </div>
   );
-}
+});
+
+export default SongRow;

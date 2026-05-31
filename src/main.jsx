@@ -9,21 +9,21 @@ import { registerSW } from 'virtual:pwa-register';
 if ('serviceWorker' in navigator) {
   registerSW({
     onNeedRefresh() {
-      if (confirm('A new version of Prachify is available. Update now?')) {
+      if (confirm('A new version of Geet is available. Update now?')) {
         window.location.reload();
       }
     },
     onOfflineReady() {
-      console.log('Prachify is ready to be used offline 🎧');
+      console.log('Geet is ready to be used offline 🎧');
     },
   });
 }
 
-// Give the cinematic splash screen time to play
+// Give the cinematic splash screen time to play (animations complete ~1.6s)
 setTimeout(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
-}, 2500);
+}, 1600);

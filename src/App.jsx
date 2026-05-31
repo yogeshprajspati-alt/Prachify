@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { usePlayerEngine } from './hooks/usePlayer';
 import { usePWAInstall } from './hooks/usePWAInstall';
@@ -7,17 +7,19 @@ import BottomPlayer from './components/BottomPlayer';
 import InstallPrompt from './components/InstallPrompt';
 import AddToPlaylistModal from './components/AddToPlaylistModal';
 import usePlayerStore from './store/playerStore';
-import Home from './pages/Home';
-import Search from './pages/Search';
-import Library from './pages/Library';
-import PlaylistPage from './pages/PlaylistPage';
-import Explore from './pages/Explore';
-import ArtistPage from './pages/ArtistPage';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import useChatStore from './store/chatStore';
 import './styles/globals.css';
 
-const HannahChat = React.lazy(() => import('./components/HannahChat'));
+// TASK-01: Lazy-load all route pages — each becomes a separate JS chunk.
+// BottomPlayer, Navbar, modals stay static (always needed immediately).
+const Home         = React.lazy(() => import('./pages/Home'));
+const Search       = React.lazy(() => import('./pages/Search'));
+const Library      = React.lazy(() => import('./pages/Library'));
+const PlaylistPage = React.lazy(() => import('./pages/PlaylistPage'));
+const Explore      = React.lazy(() => import('./pages/Explore'));
+const ArtistPage   = React.lazy(() => import('./pages/ArtistPage'));
+const HannahChat   = React.lazy(() => import('./components/HannahChat'));
 
 export default function App() {
   usePlayerEngine();
@@ -27,12 +29,14 @@ export default function App() {
   const setAddToPlaylistSong = usePlayerStore(s => s.setAddToPlaylistSong);
   const hydrateLikedFromDB = usePlayerStore(s => s.hydrateLikedFromDB);
   const hydratePlaylistsFromDB = usePlayerStore(s => s.hydratePlaylistsFromDB);
+  const pruneSkippedSongs = usePlayerStore(s => s.pruneSkippedSongs);
 
-  // On startup: sync from Supabase (overrides localStorage if DB available)
+  // On startup: sync from Supabase + prune stale skip data
   useEffect(() => {
     hydrateLikedFromDB();
     hydratePlaylistsFromDB();
-  }, [hydrateLikedFromDB, hydratePlaylistsFromDB]);
+    pruneSkippedSongs(); // TASK-14: cap skippedSongs to prevent localStorage bloat
+  }, [hydrateLikedFromDB, hydratePlaylistsFromDB, pruneSkippedSongs]);
 
   return (
     <Router>
@@ -53,14 +57,17 @@ export default function App() {
             No internet — currently playing song will continue
           </div>
         )}
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/explore" element={<Explore />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/playlist/:id" element={<PlaylistPage />} />
-          <Route path="/artist/:artistName" element={<ArtistPage />} />
-        </Routes>
+        {/* TASK-01: Suspense wraps all lazy route pages — null fallback means no flash */}
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/explore" element={<Explore />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/playlist/:id" element={<PlaylistPage />} />
+            <Route path="/artist/:artistName" element={<ArtistPage />} />
+          </Routes>
+        </Suspense>
         <BottomPlayer />
         <Navbar />
         <InstallPrompt show={showModal} canInstall={canInstall} onInstall={install} onDismiss={dismiss} />
@@ -101,9 +108,9 @@ export default function App() {
         </button>
 
         {/* Lazy Loaded Chat Interface */}
-        <React.Suspense fallback={null}>
+        <Suspense fallback={null}>
           <HannahChat />
-        </React.Suspense>
+        </Suspense>
 
       </div>
     </Router>

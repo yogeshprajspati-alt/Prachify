@@ -234,13 +234,12 @@ export function usePlayer() {
     updateMediaSession(song);
 
     // Timeout to break out of infinite loading if CDN is blocked.
-    // Bumped to 15s and also checks !audio.isPlaying() before killing — this
-    // prevents a race where the background-throttled timer fires while the song
-    // has already started playing (which was causing audio to be unloaded mid-song
-    // after turning the screen off).
+    // getDuration() === 0 confirms song never loaded at all.
+    // If duration > 0, song loaded successfully — isPlaying() may be false
+    // due to browser background throttling, not an actual error. Do not unload.
     setTimeout(() => {
       const state = usePlayerStore.getState();
-      if (state.isLoading && state.currentSong?.id === song.id && !audio.isPlaying()) {
+      if (state.isLoading && state.currentSong?.id === song.id && !audio.isPlaying() && audio.getDuration() === 0) {
         audio.unload();
         store.setIsLoading(false);
         store.setHasError(true);

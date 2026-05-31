@@ -23,10 +23,11 @@ export function setCallbacks(cbs) {
 
 export function loadAndPlay(url, startPosition = 0) {
   if (howl && currentUrl === url) {
+    // Already playing this song — do nothing. Prevents double-instance on
+    // background → foreground resume where OS audio session is already active.
+    if (howl.playing()) return;
     howl.seek(startPosition);
-    if (!howl.playing()) {
-      howl.play();
-    }
+    howl.play();
     return;
   }
 

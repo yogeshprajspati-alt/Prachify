@@ -16,7 +16,7 @@ export default function InstallPrompt({ show, canInstall, onInstall, onDismiss }
             🎧
           </div>
           <h3 className="text-lg font-bold text-text-primary mt-2">
-            Keep Prachify on your home screen 🎧
+            Keep Geet on your home screen 🎧
           </h3>
           <p className="text-xs text-text-secondary leading-relaxed">
             Install this personal late-night music space as an app for background playback, premium offline support, and lock screen controls.
