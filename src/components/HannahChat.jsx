@@ -317,10 +317,7 @@ export default function HannahChat() {
           {/* Microphone Button */}
           {!input.trim() && (
             <button
-              onPointerDown={handleRecordStart}
-              onPointerUp={handleRecordStop}
-              onPointerLeave={handleRecordStop}
-              onPointerCancel={handleRecordStop}
+              onClick={isRecording ? handleRecordStop : handleRecordStart}
               style={{
                 width: 44, height: 44, borderRadius: '50%', border: 'none',
                 background: isRecording ? '#ff3b30' : '#282828',
@@ -330,12 +327,16 @@ export default function HannahChat() {
                 boxShadow: isRecording ? '0 0 0 8px rgba(255,59,48,0.3)' : 'none',
                 animation: isRecording ? 'pulse-ring 1s ease infinite' : 'none'
               }}
-              title="Hold to Record"
+              title={isRecording ? "Tap to Stop" : "Tap to Record"}
             >
               {isTranscribing ? (
                 <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              ) : isRecording ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+                </svg>
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill={isRecording ? "#fff" : "none"} stroke={isRecording ? "#fff" : "#b3b3b3"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b3b3b3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                   <line x1="12" y1="19" x2="12" y2="23"></line>

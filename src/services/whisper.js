@@ -1,12 +1,10 @@
 // src/services/whisper.js
-// Groq Whisper STT — 3 layer fallback ke saath
+// Groq Whisper STT — Fast and accurate
 
-const GROQ_KEYS = [
-  import.meta.env.VITE_GROQ_KEY_1,
-  import.meta.env.VITE_GROQ_KEY_2,
-  import.meta.env.VITE_GROQ_KEY_3,
-  import.meta.env.VITE_GROQ_KEY_4,
-].filter(Boolean);
+const GROQ_KEYS = (import.meta.env.VITE_GROQ_API_KEY || '')
+  .split(',')
+  .map(k => k.trim())
+  .filter(Boolean);
 
 let currentKeyIndex = 0;
 
@@ -29,7 +27,9 @@ export async function transcribeWithWhisper(audioBlob) {
   const formData = new FormData();
   formData.append('file', audioBlob, ext);
   formData.append('model', 'whisper-large-v3');
-  formData.append('language', 'hi'); // Hindi + Hinglish + English
+  // Adding a prompt heavily biases the AI to spell these artist names correctly 
+  // and understand that this is a music context.
+  formData.append('prompt', 'Play songs by Arijit Singh, AP Dhillon, Diljit Dosanjh, Shreya Ghoshal, Karan Aujla, Sidhu Moose Wala. Bollywood, Punjabi, Hindi, English, play, pause, next, song, music.');
 
   formData.append('response_format', 'json');
 
@@ -57,49 +57,7 @@ export async function transcribeWithWhisper(audioBlob) {
   return null;
 }
 
-// ─── Browser STT ────────────────────────────────────────────
-export function transcribeWithBrowser() {
-  return new Promise((resolve) => {
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) { resolve(null); return; }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'hi-IN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    let resolved = false; // double-resolve guard
-
-    recognition.onresult = e => {
-      if (resolved) return;
-      resolved = true;
-      const transcript = e.results[0]?.[0]?.transcript?.trim() || null;
-      const confidence = e.results[0]?.[0]?.confidence || 0;
-      // Low confidence result return karo — Whisper better karega
-      resolve(confidence > 0.6 ? transcript : null);
-    };
-    recognition.onerror = () => { if (!resolved) { resolved = true; resolve(null); } };
-    recognition.onend   = () => { if (!resolved) { resolved = true; resolve(null); } };
-
-    try { recognition.start(); }
-    catch { resolve(null); }
-  });
-}
-
-// ─── Parallel race — jo pehle aur better aaye ───────────────
+// Wrapper to keep compatibility with existing code
 export async function transcribeBest(audioBlob) {
-  // Dono parallel shuru karo
-  const [whisperResult, browserResult] = await Promise.allSettled([
-    transcribeWithWhisper(audioBlob),
-    transcribeWithBrowser(),
-  ]);
-
-  const whisper = whisperResult.status === 'fulfilled' ? whisperResult.value : null;
-  const browser = browserResult.status === 'fulfilled' ? browserResult.value : null;
-
-  // Whisper prefer karo — zyada accurate hai Hindi/Hinglish mein
-  // Browser STT result sirf tab use karo jab Whisper fail ho
-  return whisper || browser || null;
+  return await transcribeWithWhisper(audioBlob);
 }
