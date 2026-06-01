@@ -22,15 +22,19 @@ export function setCallbacks(cbs) {
 }
 
 export function loadAndPlay(url, startPosition = 0) {
-  if (howl && currentUrl === url) {
-    // Already playing this song — do nothing. Prevents double-instance on
-    // background → foreground resume where OS audio session is already active.
-    if (howl.playing()) return;
+  // Same URL already playing — double-play guard
+  if (howl && currentUrl === url && howl.playing()) {
+    return;
+  }
+
+  // Same URL but paused — seek aur play karo, naya instance mat banao
+  if (howl && currentUrl === url && !howl.playing()) {
     howl.seek(startPosition);
     howl.play();
     return;
   }
 
+  // Naya song — pehla unload karo
   if (howl) {
     howl.unload();
     howl = null;
@@ -59,6 +63,36 @@ export function loadAndPlay(url, startPosition = 0) {
   });
 
   howl.play();
+}
+
+// Sirf load karo — play mat karo (startup ke liye)
+// Full callbacks wired karo — taaki user Play dabaye toh onPlay fire ho aur UI update ho
+export function loadOnly(url, startPosition = 0) {
+  if (howl) {
+    howl.unload();
+    howl = null;
+  }
+  currentUrl = url;
+  howl = new Howl({
+    src: [url],
+    html5: true,
+    preload: true,
+    volume: 1.0,
+    onplay: () => callbacks.onPlay?.(),
+    onpause: () => callbacks.onPause?.(),
+    onend: () => callbacks.onEnd?.(),
+    onload: () => {
+      howl.seek(startPosition);
+      callbacks.onLoad?.(howl.duration());
+    },
+    onloaderror: (id, err) => callbacks.onError?.(err),
+    onplayerror: (id, err) => {
+      howl.once('unlock', () => howl.play());
+      callbacks.onError?.(err);
+    },
+    onseek: () => callbacks.onSeek?.(),
+  });
+  // play() intentionally nahi hai — startup pe paused rehna chahiye
 }
 
 export function play() { howl?.play(); }

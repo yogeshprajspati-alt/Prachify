@@ -111,6 +111,15 @@ export function usePlayerEngine() {
     const nextSong = store.nextSong();
     if (nextSong) {
       playSong(nextSong);
+
+      // Background playback guard — browser background mein play() suppress ho
+      // sakta hai. 800ms baad check karo: agar song load ho gaya par play nahi
+      // hua toh manually trigger karo.
+      setTimeout(() => {
+        if (!audio.isPlaying()) {
+          audio.play();
+        }
+      }, 800);
     } else {
       handleQueueEnd();
     }
@@ -168,8 +177,10 @@ export function usePlayerEngine() {
     const { currentSong, position, volume, isMuted } = usePlayerStore.getState();
     if (currentSong) {
       audio.setVolume(isMuted ? 0 : volume);
-      audio.loadAndPlay(currentSong.url, position || 0);
+      audio.loadOnly(currentSong.url, position || 0); // sirf load, auto-play nahi
       updateMediaSession(currentSong);
+      // UI ko paused state mein rakho — user manually play karega
+      usePlayerStore.getState().setIsPlaying(false);
     }
 
     return () => { stopPositionTick(); };
