@@ -75,6 +75,6 @@ export async function importSpotifyPlaylistLink(url) {
     };
   } catch (error) {
     console.error('Spotify import error:', error);
-    throw new Error(error.message || 'Failed to import Spotify playlist.');
+    throw new Error(error.message || 'Failed to import Spotify playlist.', { cause: error });
   }
 }

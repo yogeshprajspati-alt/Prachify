@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
-import ImportPlaylistModal from '../components/ImportPlaylistModal';
+import { useChangelog } from '../hooks/useChangelog';
+import ChangelogModal from '../components/ChangelogModal';
 
 export default function Library() {
   const navigate = useNavigate();
@@ -9,7 +10,7 @@ export default function Library() {
   const likedSongs = usePlayerStore(s => s.likedSongs);
   const createPlaylist = usePlayerStore(s => s.createPlaylist);
   const [filter, setFilter] = useState('All');
-  const [showImport, setShowImport] = useState(false);
+  const { changelog, hasNew, isOpen: changelogOpen, openChangelog, closeChangelog } = useChangelog();
 
   const filters = ['All', 'Playlists'];
 
@@ -25,10 +26,21 @@ export default function Library() {
           </div>
           <span style={{ fontSize: 18, fontWeight: 800 }}>Your Library</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button onClick={() => setShowImport(true)} style={smallIconBtn} title="Import">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+            {/* What's New Button */}
+            <button onClick={openChangelog} style={{ ...smallIconBtn, position: 'relative' }} title="What's New">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b3b3b3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
+              {hasNew && (
+                <span style={{
+                  position: 'absolute', top: 4, right: 4,
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: '#ff2d55',
+                  border: '1.5px solid #121212',
+                }} />
+              )}
             </button>
             <button onClick={() => { const t = prompt('Playlist name:'); if (t) navigate(`/playlist/${createPlaylist(t.trim()).id}`); }} style={smallIconBtn} title="New playlist">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
@@ -74,7 +86,7 @@ export default function Library() {
         </button>
       ))}
 
-      {showImport && <ImportPlaylistModal show onClose={() => setShowImport(false)} onSuccess={pl => { setShowImport(false); navigate(`/playlist/${pl.id}`); }} />}
+      {changelogOpen && <ChangelogModal changelog={changelog} onClose={closeChangelog} />}
     </div>
   );
 }

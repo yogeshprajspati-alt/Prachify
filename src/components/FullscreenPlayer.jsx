@@ -427,7 +427,8 @@ export default function FullscreenPlayer({
                 <button
                   onClick={() => { if (abLoop.active) resetAbLoop(); else setAbPoint('auto'); }}
                   style={{
-                    padding: '5px 12px', borderRadius: 20, border: 'none',
+                    padding: '5px 12px', borderRadius: 20,
+
                     background: abLoop.active ? 'rgba(29,185,84,0.15)' : abLoop.a !== null ? 'rgba(255,165,0,0.15)' : 'rgba(255,255,255,0.06)',
                     color: abLoop.active ? '#1DB954' : abLoop.a !== null ? '#FFA500' : 'rgba(255,255,255,0.6)',
                     fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',

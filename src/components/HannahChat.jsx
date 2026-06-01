@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useChatStore from '../store/chatStore';
 import usePlayerStore from '../store/playerStore';
-import { sendChatMessage, transcribeAudio, logToSheets } from '../services/gemini';
+import { sendChatMessage, logToSheets } from '../services/gemini';
+import { transcribeBest } from '../services/whisper';
 import { usePlayer } from '../hooks/usePlayer';
 import { searchSongs } from '../services/jiosaavn';
 
@@ -25,53 +26,65 @@ export default function HannahChat() {
 
   if (!isOpen) return null;
 
-  const startRecording = async () => {
+  const handleRecordStart = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      
+      const mimeType = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg',
+        '',
+      ].find(type => type === '' || MediaRecorder.isTypeSupported(type));
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      
+      mediaRecorderRef.current = { recorder: mediaRecorder, stream };
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-
-        setIsTranscribing(true);
-        try {
-          const text = await transcribeAudio(audioBlob);
-          if (text && text.trim()) {
-            handleSend(text.trim());
-          }
-        } catch (error) {
-          console.error("Transcription failed", error);
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      mediaRecorder.start();
+      mediaRecorder.start(100); // har 100ms pe data chunk
       setIsRecording(true);
     } catch (err) {
       console.error("Error accessing microphone", err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
   };
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
+  const handleRecordStop = async () => {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    
+    setIsRecording(false);
+
+    const { recorder, stream } = mediaRecorderRef.current;
+    mediaRecorderRef.current = null;
+    recorder.stop();
+    stream.getTracks().forEach(t => t.stop());
+
+    await new Promise(r => { recorder.onstop = r; });
+    
+    const audioBlob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+
+    // Too short — accidental tap ignore karo (< 500ms recording)
+    if (audioBlob.size < 1000) return;
+
+    setIsTranscribing(true);
+
+    try {
+      // Parallel transcription — best result use karo
+      const transcript = await transcribeBest(audioBlob);
+      
+      if (transcript && transcript.trim()) {
+        handleSend(transcript.trim());
+      }
+    } catch (error) {
+      console.error("Transcription failed", error);
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -304,15 +317,20 @@ export default function HannahChat() {
           {/* Microphone Button */}
           {!input.trim() && (
             <button
-              onClick={toggleRecording}
+              onPointerDown={handleRecordStart}
+              onPointerUp={handleRecordStop}
+              onPointerLeave={handleRecordStop}
+              onPointerCancel={handleRecordStop}
               style={{
                 width: 44, height: 44, borderRadius: '50%', border: 'none',
-                background: isRecording ? '#e8115b' : '#282828',
+                background: isRecording ? '#ff3b30' : '#282828',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                transition: 'all 0.2s',
-                animation: isRecording ? 'pulse-red 1.5s infinite' : 'none'
+                transition: 'transform 0.15s ease',
+                transform: isRecording ? 'scale(1.15)' : 'scale(1)',
+                boxShadow: isRecording ? '0 0 0 8px rgba(255,59,48,0.3)' : 'none',
+                animation: isRecording ? 'pulse-ring 1s ease infinite' : 'none'
               }}
-              title={isRecording ? "Stop Recording" : "Start Voice Note"}
+              title="Hold to Record"
             >
               {isTranscribing ? (
                 <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
@@ -353,10 +371,10 @@ export default function HannahChat() {
           0%, 80%, 100% { transform: scale(0); }
           40% { transform: scale(1); }
         }
-        @keyframes pulse-red {
-          0% { box-shadow: 0 0 0 0 rgba(232, 17, 91, 0.4); }
-          70% { box-shadow: 0 0 0 10px rgba(232, 17, 91, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(232, 17, 91, 0); }
+        @keyframes pulse-ring {
+          0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.5); }
+          70% { box-shadow: 0 0 0 14px rgba(255, 59, 48, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
         }
         @keyframes spin {
           to { transform: rotate(360deg); }

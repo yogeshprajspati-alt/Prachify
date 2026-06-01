@@ -118,7 +118,7 @@ async function fetchWithFallback(subpath) {
     try {
       return await apiFetch(subpath);
     } catch (err) {
-      throw new Error(`API unreachable: ${err.message}`);
+      throw new Error(`API unreachable: ${err.message}`, { cause: err });
     }
   }
 }
@@ -158,18 +158,6 @@ export async function getAlbum(id) {
   };
 }
 
-export async function getPlaylist(id) {
-  const json = await fetchWithFallback(`/playlists?id=${id}`);
-  const pl = json?.data || json;
-  if (!pl) return null;
-  return {
-    id: pl.id,
-    title: pl.name,
-    cover: extractCover(pl.image),
-    description: pl.description || '',
-    songs: (pl.songs || []).map(normalizeSong).filter(Boolean),
-  };
-}
 
 const TRENDING_QUERIES = [
   'trending hindi songs 2025',

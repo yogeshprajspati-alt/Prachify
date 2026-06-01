@@ -1,0 +1,93 @@
+[
+  {
+    "version": "1.1.0",
+    "date": "2026-06-01",
+    "updates": [
+      "👾 Added, Rollups and updates section",
+      "⚙️ Resolved auto-play audio doubling issues",
+      "⚙️ Updated UI Color Palette",
+      "👾 Enhanced Voice related section, more precise and accurate"
+    ]
+  },
+  {
+    "version": "1.0.9",
+    "date": "2026-05-31",
+    "updates": [
+      "📩 Renamed to Geet",
+      "📩 Optimized the UI for better perfomance and user experience"
+    ]
+  },
+  {
+    "version": "1.0.8",
+    "date": "2026-05-30",
+    "updates": [
+      "🌵 Fixed Playback issues",
+      "🌵 Fixed Queue issues",
+      "🎀 Improved Recommendation system",
+      "🎀 Cache Limiting and Boundation For Low End Devices"
+    ]
+  },
+  {
+    "version": "1.0.7",
+    "date": "2026-05-29",
+    "updates": [
+      "🫨 New Splash Screen, more Like Spotify",
+      "⚡ Perfomance Optimization",
+      "✨ UI Improvements"
+    ]
+  },
+  {
+    "version": "1.0.6",
+    "date": "2026-05-28",
+    "updates": [
+      "🎓 Upgraded Hannah's UI ",
+      "🎓 Upgraded for hannah for full app control",
+      "🎓 Full Screen Player with more features A-B Loop, playback Speed"
+    ]
+  },
+  {
+    "version": "1.0.5",
+    "date": "2026-05-27",
+    "updates": [
+      "⚡ Upgrded the Sync Functions for better perfomance",
+      "✨ UI Improvements",
+      "➕ Hannah Inttregation",
+      "✨ Even Better UI in terms of beauty ",
+      "👾 Refresh buttons in explore section"
+    ]
+  },
+  {
+    "version": "1.0.4",
+    "date": "2026-05-26",
+    "updates": [
+      "🫗 Edit Delete options in playlists as well as Queues",
+      "🎓 Search From Playlist Feature",
+      "➕ Dedicated Songs Section And Great Lazy Loaded Explore Section"
+    ]
+  },
+  {
+    "version": "1.0.3",
+    "date": "2026-05-25",
+    "updates": [
+      "➕ Youtue Music Inspired related section",
+      "➕ Youtube Music Inspired Queues"
+    ]
+  },
+  {
+    "version": "1.0.2",
+    "date": "2026-05-24",
+    "updates": [
+      "⚙️ Improved the player in terms of UI",
+      "⚙️ Glassmorphism Adaptation",
+      "⚙️ Compact UI"
+    ]
+  },
+  {
+    "version": "1.0.1",
+    "date": "2026-05-23",
+    "updates": [
+      "🎀 Redesigning the UI/UX",
+      "🎀 Better cards and sections"
+    ]
+  }
+]

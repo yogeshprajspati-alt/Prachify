@@ -54,32 +54,37 @@ HOW TO RESPOND:
 `;
 
 export async function askHannah(messages) {
-  const contents = messages.map(msg => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
+  const formattedMessages = messages.map(msg => ({
+    role: msg.role === 'assistant' || msg.role === 'model' ? 'assistant' : 'user',
+    content: msg.content,
   }));
 
   const body = {
-    system_instruction: {
-      parts: [{ text: SYSTEM_PROMPT }],
-    },
-    contents,
-    generationConfig: {
-      temperature: 0.8,
-      maxOutputTokens: 300,
-      topP: 0.9,
-    },
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...formattedMessages,
+    ],
+    temperature: 0.8,
+    max_tokens: 300,
+    top_p: 0.9,
   };
 
-  const res = await fetch(GEMINI_URL, {
+  const keys = GROQ_API_KEY.split(',').map(k => k.trim()).filter(Boolean);
+  const randomKey = keys[Math.floor(Math.random() * keys.length)];
+
+  const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${randomKey}`,
+    },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) throw new Error('Hannah is unavailable right now');
 
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text
+  return data.choices?.[0]?.message?.content
     || "Hmm, I couldn't think of a response 🙈";
 }

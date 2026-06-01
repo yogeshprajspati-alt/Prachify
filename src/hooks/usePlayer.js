@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import usePlayerStore from '../store/playerStore';
 import * as audio from '../services/audioEngine';
 import { updateMediaSession, setMediaSessionHandlers, setMediaSessionState } from '../services/mediaSession';
+import { searchSongs } from '../services/jiosaavn';
 
 /**
  * Core player hook — bridges Zustand store ↔ Howler engine.
@@ -71,13 +72,11 @@ export function usePlayerEngine() {
       if (remaining.length < 3) {
         const artistName = currentSong.artist?.split(',')[0]?.trim();
         if (artistName) {
-          import('../services/jiosaavn').then(({ searchSongs }) => {
-            searchSongs(artistName, 10).then(results => {
-              const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
-              const fresh = results.filter(s => !queueIds.has(s.id)).slice(0, 6);
-              usePlayerStore.getState().setRadioSeeds(fresh);
-            }).catch(() => {});
-          });
+          searchSongs(artistName, 10).then(results => {
+            const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
+            const fresh = results.filter(s => !queueIds.has(s.id)).slice(0, 6);
+            usePlayerStore.getState().setRadioSeeds(fresh);
+          }).catch(() => {});
         }
       }
       return;
@@ -88,7 +87,6 @@ export function usePlayerEngine() {
     if (!artistName) return;
 
     try {
-      const { searchSongs } = await import('../services/jiosaavn');
       const results = await searchSongs(artistName, 10);
       const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
       const filtered = results.filter(s => s.id !== currentSong.id && !queueIds.has(s.id)).slice(0, 6);
@@ -100,7 +98,9 @@ export function usePlayerEngine() {
         usePlayerStore.getState().setQueue(newQueue, newQueue.length - 1);
         playSong(next);
       }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to fetch next song for smart queue:', err);
+    }
   }, [playSong]);
 
   const handleNext = useCallback(() => {
