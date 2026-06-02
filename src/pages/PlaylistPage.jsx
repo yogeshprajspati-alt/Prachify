@@ -116,7 +116,7 @@ export default function PlaylistPage() {
   const handleDeletePlaylist = () => { deletePlaylist(id); navigate('/library'); };
 
   return (
-    <div className="page" style={{ background: '#121212', paddingBottom: 140 }}>
+    <div className="page" style={{ background: '#121212' }}>
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(180deg, #5a3a7e 0%, #121212 100%)', paddingBottom: 24 }}>

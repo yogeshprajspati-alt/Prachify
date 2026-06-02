@@ -65,57 +65,57 @@ export default function Explore() {
     {
       label: 'Romantic 💖', color: '#e8115b',
       queries: [
-        'romantic hindi songs 2024', 'love songs bollywood arijit singh',
-        'romantic bollywood hits', 'pyaar ke gaane hindi', 'dil songs bollywood',
+        'romantic bollywood hits 2024', 'love songs top hits',
+        'lofi romantic hindi', 'soulful bollywood love songs', 'trending romantic hindi',
       ],
     },
     {
       label: 'Party 🎉', color: '#bc5900',
       queries: [
-        'party songs bollywood 2024', 'dance hits bollywood',
-        'party anthem bollywood', 'dance floor hits hindi', 'bollywood party songs',
+        'party songs bollywood 2024', 'dance hits chartbusters',
+        'bollywood club anthems', 'upbeat punjabi party', 'trending party hindi',
       ],
     },
     {
       label: 'Chill ☕', color: '#477d95',
       queries: [
-        'chill lofi hindi', 'relaxing bollywood songs',
-        'soft hindi songs acoustic', 'peaceful bollywood music', 'lo-fi hindi beats',
+        'chill lofi hindi', 'acoustic bollywood covers',
+        'soft hindi indie', 'peaceful bollywood music', 'lo-fi hindi beats',
       ],
     },
     {
       label: '90s Hits 📻', color: '#537aa1',
       queries: [
-        '90s bollywood hits hindi', 'purane bollywood gaane',
-        'classic hindi songs 90s', 'retro bollywood songs', '90s hindi evergreen',
+        '90s bollywood superhits', 'evergreen bollywood classics',
+        'retro hindi songs', '90s romantic hindi hits', '90s top hits hd',
       ],
     },
     {
       label: 'Punjabi 🥁', color: '#e8a020',
       queries: [
-        'punjabi hits 2024 diljit', 'new punjabi songs 2024',
-        'diljit dosanjh latest', 'ap dhillon songs', 'punjabi pop 2024',
+        'punjabi pop blockbusters', 'urban punjabi top hits',
+        'punjabi viral hits', 'punjabi pop anthems', 'urban punjabi hits',
       ],
     },
     {
       label: 'Sad 🌙', color: '#503750',
       queries: [
-        'sad hindi songs bollywood', 'emotional hindi songs arijit',
-        'heartbreak hindi songs', 'dard bhari shayari songs', 'tanha hindi songs',
+        'sad romantic hindi blockbusters', 'emotional bollywood hits',
+        'heartbreak hindi lo-fi', 'soulful sad hindi songs', 'sad acoustic hindi',
       ],
     },
     {
       label: 'Workout 💪', color: '#1DB954',
       queries: [
-        'workout songs hindi bollywood', 'gym motivation bollywood',
-        'high energy hindi songs', 'power hindi songs', 'running songs bollywood',
+        'workout energetic hindi hits', 'bollywood gym anthems',
+        'high energy punjabi workout', 'power bollywood hits', 'trending workout hindi',
       ],
     },
     {
       label: 'Devotional 🙏', color: '#c9a227',
       queries: [
-        'hindi bhajan songs', 'devotional hindi songs',
-        'morning hindi aarti', 'hindi mantra songs', 'bhakti songs hindi',
+        'soothing hindi bhajan', 'divine chants hindi',
+        'krishna bhajan lofi', 'morning aarti premium', 'peaceful devotional hindi',
       ],
     },
   ];

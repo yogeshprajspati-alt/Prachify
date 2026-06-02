@@ -1,6 +1,6 @@
 import React, { useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { usePlayerEngine } from './hooks/usePlayer';
+import { usePlayerEngine, usePlayer } from './hooks/usePlayer';
 import { usePWAInstall } from './hooks/usePWAInstall';
 import Navbar from './components/Navbar';
 import BottomPlayer from './components/BottomPlayer';
@@ -21,6 +21,32 @@ const Explore      = React.lazy(() => import('./pages/Explore'));
 const ArtistPage   = React.lazy(() => import('./pages/ArtistPage'));
 const HannahChat   = React.lazy(() => import('./components/HannahChat'));
 
+function GlobalShortcuts() {
+  const { togglePlay, next, prev } = usePlayer();
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowRight' && e.ctrlKey) {
+        e.preventDefault();
+        next();
+      } else if (e.code === 'ArrowLeft' && e.ctrlKey) {
+        e.preventDefault();
+        prev();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, next, prev]);
+  
+  return null;
+}
+
 export default function App() {
   usePlayerEngine();
   const isOnline = useOnlineStatus();
@@ -40,7 +66,7 @@ export default function App() {
 
   return (
     <Router>
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: '#121212' }}>
+      <div className="app-container">
         {!isOnline && (
           <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
@@ -58,18 +84,21 @@ export default function App() {
           </div>
         )}
         {/* TASK-01: Suspense wraps all lazy route pages — null fallback means no flash */}
-        <Suspense fallback={null}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/explore" element={<Explore />} />
-            <Route path="/library" element={<Library />} />
-            <Route path="/playlist/:id" element={<PlaylistPage />} />
-            <Route path="/artist/:artistName" element={<ArtistPage />} />
-          </Routes>
-        </Suspense>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <Suspense fallback={null}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/library" element={<Library />} />
+              <Route path="/playlist/:id" element={<PlaylistPage />} />
+              <Route path="/artist/:artistName" element={<ArtistPage />} />
+            </Routes>
+          </Suspense>
+        </main>
         <BottomPlayer />
         <Navbar />
+        <GlobalShortcuts />
         <InstallPrompt show={showModal} canInstall={canInstall} onInstall={install} onDismiss={dismiss} />
         <AddToPlaylistModal
           show={!!addToPlaylistSong}

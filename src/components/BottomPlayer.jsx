@@ -26,21 +26,9 @@ export default function BottomPlayer() {
     <>
       <MiniLyrics song={currentSong} position={position} />
       {/* ── Mini player ────────────────────────────────────────────────── */}
-      <div style={{
-        position: 'fixed', bottom: 56, left: '50%', transform: 'translateX(-50%)',
-        width: 'calc(100% - 16px)', maxWidth: 414,
-        zIndex: 45,
-      }}>
+      <div className="bottom-player-container">
         {/* Glassmorphism card */}
-        <div style={{
-          background: 'rgba(30,30,30,0.82)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          borderRadius: '16px',
-          border: '1px solid rgba(255,255,255,0.08)',
-          overflow: 'hidden',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
-        }}>
+        <div className="bottom-player-card">
           {/* Progress bar — scaleX instead of width for GPU-composited animation */}
           <div style={{ height: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
             <div style={{ height: '100%', background: '#1DB954', width: '100%', transform: `scaleX(${pct / 100})`, transformOrigin: 'left', transition: 'transform 0.2s linear', borderRadius: 1 }} />
@@ -48,6 +36,7 @@ export default function BottomPlayer() {
 
           {/* Row */}
           <div
+            className="bottom-player-inner"
             style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 12, cursor: 'pointer' }}
             onClick={() => setExpanded(true)}
           >

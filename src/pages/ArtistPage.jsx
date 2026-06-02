@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { searchSongs } from '../services/jiosaavn';
+import { searchSongs, searchArtists } from '../services/jiosaavn';
 import usePlayerStore from '../store/playerStore';
 import { usePlayer } from '../hooks/usePlayer';
 
 const _artistCache = {};
+const _artistDetailsCache = {};
 
 export default function ArtistPage() {
   const { artistName } = useParams();
@@ -12,24 +13,62 @@ export default function ArtistPage() {
   const decoded = decodeURIComponent(artistName);
   const [songs, setSongs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [artistDetails, setArtistDetails] = useState(null);
+  
   const { playSong } = usePlayer();
   const { currentSong, isPlaying, setQueue } = usePlayerStore();
 
   useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+
+    if (_artistDetailsCache[decoded]) {
+      setArtistDetails(_artistDetailsCache[decoded]);
+    } else {
+      searchArtists(decoded, 1).then(res => {
+        if (res.length > 0) {
+          _artistDetailsCache[decoded] = res[0];
+          setArtistDetails(res[0]);
+        }
+      }).catch(() => {});
+    }
+
     if (_artistCache[decoded]) {
       setSongs(_artistCache[decoded]);
+      setPage(Math.ceil(_artistCache[decoded].length / 20));
       setLoading(false);
       return;
     }
     setLoading(true);
-    searchSongs(decoded, 20)
+    searchSongs(decoded, 20, 1)
       .then(results => {
         _artistCache[decoded] = results;
         setSongs(results);
+        if (results.length < 20) setHasMore(false);
       })
       .catch(() => setSongs([]))
       .finally(() => setLoading(false));
   }, [decoded]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    
+    searchSongs(decoded, 20, nextPage)
+      .then(newResults => {
+        if (newResults.length < 20) setHasMore(false);
+        const combined = [...songs, ...newResults];
+        _artistCache[decoded] = combined;
+        setSongs(combined);
+        setPage(nextPage);
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoadingMore(false));
+  };
 
   const playAll = (startIdx = 0) => {
     setQueue(songs, startIdx);
@@ -46,19 +85,42 @@ export default function ArtistPage() {
         </button>
 
         {/* Artist hero */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #1DB954, #191414)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, fontSize: 32 }}>
-            🎤
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>{decoded}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{songs.length} songs</p>
+        <div style={{ marginBottom: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          {artistDetails?.image ? (
+            <img 
+              src={artistDetails.image} 
+              alt={decoded} 
+              style={{ width: 180, height: 180, borderRadius: '50%', objectFit: 'cover', marginBottom: 20, boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }} 
+              onError={e => e.target.src = 'https://www.jiosaavn.com/_i/3.0/artist-default-music.png'}
+            />
+          ) : (
+            <div style={{ width: 140, height: 140, borderRadius: '50%', background: 'linear-gradient(135deg, #1DB954, #191414)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20, fontSize: 48, boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
+              🎤
+            </div>
+          )}
+          <h1 style={{ fontSize: 44, fontWeight: 900, marginBottom: 8, letterSpacing: '-0.04em' }}>{decoded}</h1>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 24, fontWeight: 500 }}>{songs.length > 0 ? `${songs.length} popular tracks` : 'Loading...'}</p>
 
           {songs.length > 0 && (
             <button
               onClick={() => playAll(0)}
-              style={{ marginTop: 16, background: '#1DB954', border: 'none', borderRadius: 24, padding: '10px 28px', color: '#000', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ 
+                background: '#1DB954', 
+                border: 'none', 
+                borderRadius: 32, 
+                padding: '14px 44px', 
+                color: '#000', 
+                fontWeight: 800, 
+                fontSize: 15, 
+                cursor: 'pointer', 
+                fontFamily: 'inherit',
+                transition: 'all 0.2s',
+                boxShadow: '0 8px 24px rgba(29,185,84,0.3)'
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
             >
-              ▶ Play all
+              ▶ Play All
             </button>
           )}
         </div>
@@ -100,6 +162,33 @@ export default function ArtistPage() {
               </button>
             );
           })
+        )}
+        
+        {/* Load More Button */}
+        {songs.length > 0 && hasMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0 40px' }}>
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              style={{
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 24,
+                padding: '10px 32px',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: loadingMore ? 'default' : 'pointer',
+                opacity: loadingMore ? 0.5 : 1,
+                fontFamily: 'inherit',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => !loadingMore && (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+              onMouseLeave={e => !loadingMore && (e.currentTarget.style.background = 'transparent')}
+            >
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </button>
+          </div>
         )}
       </div>
     </div>

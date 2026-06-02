@@ -54,46 +54,46 @@ export default function Home() {
 
     // Trending:
     const cachedTrending = getHome('trending');
-    if (cachedTrending) {
+    if (cachedTrending && cachedTrending.length > 0) {
       setTrending(cachedTrending);
     } else {
       getTrending().then(s => {
         const sliced = s.slice(0, 10);
-        setHome('trending', sliced);
+        if (sliced.length > 0) setHome('trending', sliced);
         setTrending(sliced);
       }).catch(() => {});
     }
 
     // Recommendations:
     const cachedRecs = getHome('recommendations');
-    if (cachedRecs) {
+    if (cachedRecs && cachedRecs.length > 0) {
       setRecommendations(cachedRecs);
       setLoadingRecs(false);
     } else {
       getRecommendations(likedSongObjects, recentObjects, skippedSongs)
-        .then(r => { setHome('recommendations', r); setRecommendations(r); })
+        .then(r => { if (r.length > 0) setHome('recommendations', r); setRecommendations(r); })
         .finally(() => setLoadingRecs(false));
     }
 
     // Daily Mix:
     const cachedMix = getHome('dailyMix');
-    if (cachedMix) {
+    if (cachedMix && cachedMix.length > 0) {
       setDailyMix(cachedMix);
       setLoadingMix(false);
     } else {
       getDailyMix(likedSongObjects)
-        .then(m => { setHome('dailyMix', m); setDailyMix(m); })
+        .then(m => { if (m.length > 0) setHome('dailyMix', m); setDailyMix(m); })
         .finally(() => setLoadingMix(false));
     }
 
     // Gems:
     const cachedGems = getHome('gems');
-    if (cachedGems) {
+    if (cachedGems && cachedGems.length > 0) {
       setHiddenGems(cachedGems);
       setLoadingGems(false);
     } else {
       getHiddenGems(likedSongObjects, recentObjects)
-        .then(g => { setHome('gems', g); setHiddenGems(g); })
+        .then(g => { if (g.length > 0) setHome('gems', g); setHiddenGems(g); })
         .finally(() => setLoadingGems(false));
     }
   }, []);  // eslint-disable-line
@@ -143,7 +143,7 @@ export default function Home() {
         </div>
 
         {/* Sleek compact grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div className="stats-grid">
           {statTiles.map(tile => (
             <button key={tile.label} onClick={tile.action}
               style={{

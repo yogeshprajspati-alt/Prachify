@@ -125,8 +125,8 @@ async function fetchWithFallback(subpath) {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-export async function searchSongs(query, limit = 20) {
-  const json = await fetchWithFallback(`/search/songs?query=${encodeURIComponent(query)}&limit=${limit}`);
+export async function searchSongs(query, limit = 20, page = 1) {
+  const json = await fetchWithFallback(`/search/songs?query=${encodeURIComponent(query)}&limit=${limit}&page=${page}`);
   
   // Handle multiple response shapes
   const results = 
@@ -136,6 +136,23 @@ export async function searchSongs(query, limit = 20) {
     [];
 
   return results.map(normalizeSong).filter(Boolean);
+}
+
+export async function searchArtists(query, limit = 20, page = 1) {
+  const json = await fetchWithFallback(`/search/artists?query=${encodeURIComponent(query)}&limit=${limit}&page=${page}`);
+  
+  const results = 
+    json?.data?.results || 
+    json?.data || 
+    json?.results || 
+    [];
+
+  return results.map(raw => ({
+    id: raw.id,
+    name: decodeHtml(raw.name || raw.title),
+    image: extractCover(raw.image),
+    type: 'artist'
+  })).filter(Boolean);
 }
 
 export async function getSong(id) {
@@ -238,7 +255,10 @@ export async function getDailyMix(likedSongObjects = []) {
   // Return cached mix if it already exists for today
   try {
     const cached = localStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.length > 0) return parsed;
+    }
   } catch (e) { console.warn('Failed to read daily mix cache:', e); }
 
   try {
@@ -274,7 +294,9 @@ export async function getDailyMix(likedSongObjects = []) {
     const shuffled = mix.sort(() => Math.random() - 0.5).slice(0, 20);
 
     // Cache for the day
-    try { localStorage.setItem(cacheKey, JSON.stringify(shuffled)); } catch (e) { console.warn('Failed to cache daily mix:', e); }
+    if (shuffled.length > 0) {
+      try { localStorage.setItem(cacheKey, JSON.stringify(shuffled)); } catch (e) { console.warn('Failed to cache daily mix:', e); }
+    }
 
     return shuffled;
   } catch {
@@ -286,14 +308,14 @@ export async function getDailyMix(likedSongObjects = []) {
 // Searches niche/underplayed queries and filters out songs the user already knows.
 export async function getHiddenGems(likedSongObjects = [], recentlyPlayedSongs = []) {
   const GEM_QUERIES = [
-    'underrated hindi songs',
-    'indie hindi music',
-    'hidden gems bollywood',
-    'lesser known hindi hits',
-    'underground hindi artists',
-    'unpopular bollywood songs',
-    'folk fusion hindi',
     'indie pop india',
+    'coke studio hits',
+    'soulful indie hindi',
+    'acoustic hindi covers',
+    'lofi bollywood aesthetic',
+    'mtv unplugged hindi',
+    'sufi rock fusion',
+    'contemporary classical hindi',
   ];
 
   try {

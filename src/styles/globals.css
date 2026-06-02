@@ -27,17 +27,61 @@ body {
   display: flex;
   flex-direction: column;
   background: #121212;
-  max-width: 430px;
   margin: 0 auto;
   position: relative;
+  width: 100%;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #121212;
+  width: 100%;
+  position: relative;
+}
+
+@media (max-width: 1023px) {
+  #root {
+    max-width: 430px;
+  }
+}
+
+@media (min-width: 1024px) {
+  #root, .app-container {
+    flex-direction: row;
+    max-width: 100%;
+  }
 }
 
 button, a { outline: none; }
 * { -webkit-tap-highlight-color: transparent; }
 
-/* Hide scrollbars */
+/* Mobile: Hide scrollbars. Desktop: Elegant custom scrollbar. */
 ::-webkit-scrollbar { display: none; }
 * { scrollbar-width: none; }
+
+@media (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+}
 
 /* EQ animation */
 .eq-bar {
@@ -76,6 +120,169 @@ button, a { outline: none; }
   flex: 1;
   overflow-y: auto;
   padding-bottom: 140px;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .page {
+    padding-bottom: 110px; /* Leave space for desktop bottom player */
+  }
+}
+
+/* ========================================= */
+/* RESPONSIVE LAYOUT CLASSES (Desktop 1024+) */
+/* ========================================= */
+
+/* Navbar / Sidebar */
+.nav-container {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: #000;
+  border-top: 1px solid #282828;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 16px;
+  min-width: 0;
+}
+
+.desktop-logo {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .nav-container {
+    position: sticky;
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 240px;
+    max-width: 240px;
+    height: 100dvh;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    border-top: none;
+    border-right: 1px solid #282828;
+    padding: 24px 16px;
+    padding-bottom: 110px;
+    order: -1; /* Ensure sidebar is on the left in row layout */
+  }
+  
+  .desktop-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 32px;
+    padding: 0 16px;
+  }
+  
+  .nav-item {
+    flex-direction: row;
+    gap: 16px;
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  
+  .nav-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .nav-item span {
+    font-size: 14px !important;
+  }
+}
+
+/* Bottom Player */
+.bottom-player-container {
+  position: fixed;
+  bottom: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 16px);
+  max-width: 414px;
+  z-index: 45;
+}
+
+.bottom-player-card {
+  background: rgba(30,30,30,0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+
+@media (min-width: 1024px) {
+  .bottom-player-container {
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    z-index: 60;
+  }
+  
+  .bottom-player-card {
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    background: #181818;
+    backdrop-filter: none;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+  }
+}
+
+/* Home Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+}
+
+/* Search Grid */
+.search-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (min-width: 1024px) {
+  .search-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
 }
 
 /* Skeleton shimmer animation */
