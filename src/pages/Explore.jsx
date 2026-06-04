@@ -45,16 +45,18 @@ export default function Explore() {
   // 🎵 Bas song ka naam (aur chahiye toh artist bhi) likho — baaki sab automatic!
   // Format: "Song Name" ya "Song Name - Artist Name"
   const dedicatedSongNames = [
-    "Copines x PELIGROSA - skyemane nimphia",
-    "Djobi Djoba - LucasGitanoFamily",
+    "Sooiyan",
+    "Tum Todo Na (Female Version)",
+    "Pretty Woman",
+    "Main Koi Aisa Geet Gaoon",
+    "Tumhe Jo Maine Dekha (From 'Main Hoon Na')",
     "Gulabi Aankhen - Sanam",
-    "Jashn-E-Bahaaraa",
     "Tum Se Hi",
-    "Kaise Hua",
     "Sajni",
-    "Gerua",
-    "There's Nothing Holding Me Back - Shawn Mendes",
-    "DJ Michael Double",
+    "Kaise Hua",
+    "Maskhari",
+    "Jag Ghoomeya - Salman Khan Version",
+    "Arz Kiya Hai - Coke Studio Bharat",
   ];
 
   const [dedicatedSongs, setDedicatedSongs] = useState([]);
@@ -159,7 +161,7 @@ export default function Explore() {
         const filtered = filterByLanguage(songs).slice(0, 12);
         setCached(cacheKey, filtered);
         setCatData(prev => ({ ...prev, [cat.label]: filtered }));
-      }).catch(() => {});
+      }).catch(() => { });
     });
   }, []); // eslint-disable-line
 
@@ -175,7 +177,7 @@ export default function Explore() {
         <div style={{ padding: '0 16px', marginBottom: 12 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff', margin: 0 }}>Dedicated to Prachi 💖</h2>
         </div>
-        
+
         {dedicatedLoading ? (
           <SkeletonRow />
         ) : dedicatedSongs.length > 0 ? (
@@ -186,7 +188,7 @@ export default function Explore() {
               <div style={{ fontSize: 32, marginBottom: 12 }}>💝</div>
               <div style={{ fontSize: 14, color: '#fff', fontWeight: 700, marginBottom: 6 }}>This section is waiting for your songs!</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                Open <code>Explore.jsx</code> and add song names to <br/><code>dedicatedSongNames</code> — baaki sab automatic!
+                Open <code>Explore.jsx</code> and add song names to <br /><code>dedicatedSongNames</code> — baaki sab automatic!
               </div>
             </div>
           </div>
@@ -209,7 +211,7 @@ export default function Explore() {
                       const filtered = filterByLanguage(songs).slice(0, 12);
                       setCached(`${cat.label}_${query}`, filtered);
                       setCatData(prev => ({ ...prev, [cat.label]: filtered }));
-                    }).catch(() => {});
+                    }).catch(() => { });
                   }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: 4, transition: 'color 0.15s' }}
                   onMouseOver={e => e.currentTarget.style.color = '#fff'}
@@ -217,8 +219,8 @@ export default function Explore() {
                   title="Refresh"
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <polyline points="23 4 23 10 17 10"/>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                   </svg>
                 </button>
               </div>
@@ -234,7 +236,7 @@ export default function Explore() {
           </div>
         );
       })}
-      
+
     </div>
   );
 }
