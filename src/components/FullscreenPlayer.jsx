@@ -119,16 +119,23 @@ export default function FullscreenPlayer({
   const dragAxis = useRef(null); // 'vertical' | 'horizontal' | null
   const touchPrevY = useRef(null);
 
-  // Prevent background scroll interference
+  // Prevent background scroll and native pull-to-refresh interference
   useEffect(() => {
-    const handleTouchMove = (e) => {
-      if (sheetState === 'DRAGGING') {
-        e.preventDefault(); // Lock scroll while dragging sheet
+    const el = sheetRef.current;
+    if (!el) return;
+
+    const handleNativeTouchMove = (e) => {
+      // Because dragAxis is a ref, this is completely synchronous. 
+      // It instantly blocks pull-to-refresh the millisecond the downward swipe is detected.
+      if (dragAxis.current === 'vertical') {
+        e.preventDefault(); 
       }
     };
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    return () => document.removeEventListener('touchmove', handleTouchMove);
-  }, [sheetState]);
+    
+    // Attach directly to the sheet with passive: false to ensure preventDefault works
+    el.addEventListener('touchmove', handleNativeTouchMove, { passive: false });
+    return () => el.removeEventListener('touchmove', handleNativeTouchMove);
+  }, []);
 
   const onTouchStart = e => {
     if (e.touches.length > 1) return; // ignore multi-touch
