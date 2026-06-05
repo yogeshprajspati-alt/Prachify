@@ -116,7 +116,7 @@ export default function FullscreenPlayer({
   const [sheetState, setSheetState] = useState('OPEN'); // 'OPEN' | 'DRAGGING' | 'CLOSED'
   const [dragY, setDragY] = useState(0);
   const touchStart = useRef(null);
-  const touchMoveTime = useRef(null);
+  const dragAxis = useRef(null); // 'vertical' | 'horizontal' | null
   const touchPrevY = useRef(null);
 
   // Prevent background scroll interference
@@ -132,62 +132,94 @@ export default function FullscreenPlayer({
 
   const onTouchStart = e => {
     if (e.touches.length > 1) return; // ignore multi-touch
+    const target = e.target;
+    
+    // Fix: Ignore touches on sliders (seek bar, volume) and buttons
+    if (target.closest('input[type="range"]') || target.closest('button')) return;
+
     if (tab === 'queue' || tab === 'related' || tab === 'lyrics') {
       // allow scrolling within these tabs unless we're dragging from the top handle
-      const target = e.target;
       if (!target.closest('#drag-handle')) return;
     }
-    setSheetState('DRAGGING');
+    
+    dragAxis.current = null;
     touchStart.current = { 
       x: e.touches[0].clientX, 
       y: e.touches[0].clientY,
       time: Date.now()
     };
     touchPrevY.current = e.touches[0].clientY;
-    touchMoveTime.current = Date.now();
   };
 
   const onTouchMove = e => {
-    if (sheetState !== 'DRAGGING' || !touchStart.current) return;
+    if (!touchStart.current || e.touches.length > 1) return;
+    const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
+    const dx = currentX - touchStart.current.x;
     const dy = currentY - touchStart.current.y;
-    const dx = e.touches[0].clientX - touchStart.current.x;
 
-    // Only start vertical drag if dy > dx
-    if (Math.abs(dy) > Math.abs(dx)) {
-      if (dy > 0) { // Dragging down
-        setDragY(dy);
+    // Lock the axis once we move 5px
+    if (!dragAxis.current) {
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        dragAxis.current = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
+        // Only set DRAGGING if dragging down
+        if (dragAxis.current === 'vertical' && dy > 0) {
+          setSheetState('DRAGGING');
+        }
       }
     }
+
+    if (dragAxis.current === 'vertical') {
+      if (dy > 0) setDragY(dy);
+    }
     touchPrevY.current = currentY;
-    touchMoveTime.current = Date.now();
   };
 
   const onTouchEnd = e => {
     if (!touchStart.current) return;
-    if (sheetState === 'DRAGGING') {
-      const currentY = e.changedTouches[0].clientY;
-      const elapsed = Date.now() - touchStart.current.time;
-      const velocity = elapsed > 0 ? Math.abs(currentY - touchStart.current.y) / elapsed : 0; // px/ms
-      const sheetHeight = window.innerHeight;
-      const percentDown = dragY / sheetHeight;
 
-      if (percentDown > 0.4 || velocity > 0.5) {
-        setSheetState('CLOSED');
-        setDragY(sheetHeight);
-        haptic(8); // Sheet snapped closed
-        setTimeout(() => onClose(), 300); // Wait for transition
+    // Guard for touchcancel where changedTouches might occasionally be empty on older devices
+    const endTouch = e.changedTouches?.[0];
+    const endX = endTouch ? endTouch.clientX : touchStart.current.x;
+    const endY = endTouch ? endTouch.clientY : touchPrevY.current;
+
+    if (dragAxis.current === 'vertical') {
+      if (dragY > 0) {
+        const elapsed = Date.now() - touchStart.current.time;
+        const velocity = elapsed > 0 ? Math.abs(endY - touchStart.current.y) / elapsed : 0; // px/ms
+        const sheetHeight = window.innerHeight || 800;
+        const percentDown = dragY / sheetHeight;
+
+        // Require a minimum drag distance (e.g. 20px) so a wobbly tap doesn't trigger a close!
+        if (dragY > 20 && (percentDown > 0.25 || velocity > 0.6)) {
+          setSheetState('CLOSED');
+          setDragY(sheetHeight);
+          haptic(8); // Sheet snapped closed
+          setTimeout(() => onClose(), 300); // Wait for transition
+        } else {
+          setSheetState('OPEN');
+          setDragY(0);
+        }
       } else {
+        // They dragged strictly upwards, just reset
         setSheetState('OPEN');
         setDragY(0);
       }
-    } else {
+    } else if (dragAxis.current === 'horizontal') {
       // Horizontal swipes for next/prev
-      const dx = e.changedTouches[0].clientX - touchStart.current.x;
+      const dx = endX - touchStart.current.x;
       if (dx < -60) onNext();
       if (dx > 60) onPrev();
+      
+      setSheetState('OPEN');
+      setDragY(0);
+    } else {
+      // It was just a tap without moving 5px
+      setSheetState('OPEN');
+      setDragY(0);
     }
     touchStart.current = null;
+    dragAxis.current = null;
   };
 
   // ── Album art pop animation on song change ───────────────────────────────
@@ -299,6 +331,7 @@ export default function FullscreenPlayer({
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
     >
       {/* ── Animated blurred album background ─────────────────────────── */}
       <Background cover={song.cover} artKey={artKey} />

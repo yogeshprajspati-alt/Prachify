@@ -216,6 +216,16 @@ export function usePlayerEngine() {
         setMediaSessionState('paused', audio.getPosition(), audio.getDuration());
       },
       onEnd: () => {
+        // Edge Case Guard: Browsers (especially mobile) sometimes fire a false 'ended' event 
+        // when an HTML5 audio stream is paused or buffer drops.
+        const { position, duration } = usePlayerStore.getState();
+        if (duration > 0 && position < duration - 3) {
+          console.warn('[Player Guard] Ignored false onEnd event mid-stream. Pos:', position, 'Dur:', duration);
+          store.setIsPlaying(false);
+          stopPositionTick();
+          return;
+        }
+
         stopPositionTick();
         store.setIsPlaying(false);
         store.setPosition(0);
