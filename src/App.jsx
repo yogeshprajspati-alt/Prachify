@@ -10,6 +10,62 @@ import usePlayerStore from './store/playerStore';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import useChatStore from './store/chatStore';
 import './styles/globals.css';
+// P0: import offlineManager to initialize its singleton event listeners
+import { onOnlineChange } from './utils/offlineManager.js';
+import { logEvent } from './utils/errorBus.js';
+import { showToast, dismissToast } from './utils/toast.js';
+import { getCacheStats } from './utils/lruCache.js';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+
+function PWABanner() {
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {},
+    onRegisterError(error) {
+      console.error('SW registration error', error);
+    },
+  });
+
+  if (!needRefresh) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 9999,
+      background: '#282828', padding: '12px 20px', borderRadius: 8,
+      display: 'flex', alignItems: 'center', gap: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 14
+    }}>
+      <span>A new version is available!</span>
+      <button 
+        onClick={() => updateServiceWorker(true)}
+        style={{
+          background: '#fff', color: '#000', border: 'none', padding: '6px 16px',
+          borderRadius: 20, fontWeight: 700, cursor: 'pointer', fontSize: 13
+        }}
+      >
+        Update
+      </button>
+      <button onClick={() => setNeedRefresh(false)} style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 0 }}>✕</button>
+    </div>
+  );
+}
+
+// § final.md §G.8 — Proactively check storage quota on startup
+async function checkStorageQuota() {
+  if (!navigator.storage?.estimate) return;
+  try {
+    const { usage, quota } = await navigator.storage.estimate();
+    const usedPercent = (usage / quota) * 100;
+    if (usedPercent > 80) {
+      logEvent('storage_pressure', { usedPercent: usedPercent.toFixed(1) });
+      showToast('Storage space is low. Clearing cache may be needed soon.');
+    }
+  } catch {
+    // non-critical — ignore
+  }
+}
 
 // TASK-01: Lazy-load all route pages — each becomes a separate JS chunk.
 // BottomPlayer, Navbar, modals stay static (always needed immediately).
@@ -57,12 +113,35 @@ export default function App() {
   const hydratePlaylistsFromDB = usePlayerStore(s => s.hydratePlaylistsFromDB);
   const pruneSkippedSongs = usePlayerStore(s => s.pruneSkippedSongs);
 
-  // On startup: sync from Supabase + prune stale skip data
+  // On startup: sync from Supabase + prune stale skip data + check storage quota
   useEffect(() => {
     hydrateLikedFromDB();
     hydratePlaylistsFromDB();
     pruneSkippedSongs(); // TASK-14: cap skippedSongs to prevent localStorage bloat
+    checkStorageQuota(); // § final.md §G.8
   }, [hydrateLikedFromDB, hydratePlaylistsFromDB, pruneSkippedSongs]);
+
+  // § final.md §12 — Offline banner (persistent toast on disconnect)
+  useEffect(() => {
+    return onOnlineChange((online) => {
+      if (!online) {
+        showToast("You're offline — playback continues from cache", { persist: true, id: 'offline-banner' });
+      } else {
+        dismissToast('offline-banner');
+      }
+    });
+  }, []);
+
+  // § final.md §3.1 — Log cache stats before tab is hidden (understand cache state before memory loss)
+  useEffect(() => {
+    const handleHide = () => {
+      if (document.visibilityState === 'hidden') {
+        logEvent('cache_stats_on_hide', getCacheStats());
+      }
+    };
+    document.addEventListener('visibilitychange', handleHide);
+    return () => document.removeEventListener('visibilitychange', handleHide);
+  }, []);
 
   return (
     <Router>
@@ -98,6 +177,7 @@ export default function App() {
         </main>
         <BottomPlayer />
         <Navbar />
+        <PWABanner />
         <GlobalShortcuts />
         <InstallPrompt show={showModal} canInstall={canInstall} onInstall={install} onDismiss={dismiss} />
         <AddToPlaylistModal

@@ -4,6 +4,8 @@ import { usePlayer } from '../hooks/usePlayer';
 import FullscreenPlayer from './FullscreenPlayer';
 import usePlayerStore from '../store/playerStore';
 import MiniLyrics from './MiniLyrics';
+import { haptic, HAPTIC } from '../utils/haptic.js';
+import { onUnlike } from '../services/hannahsChoice.js';
 
 export default function BottomPlayer() {
   const navigate = useNavigate();
@@ -69,7 +71,12 @@ export default function BottomPlayer() {
 
             {/* Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }} onClick={e => e.stopPropagation()}>
-              <button onClick={() => toggleLike(currentSong)} style={miniBtn}>
+              <button onClick={() => {
+                haptic(HAPTIC.LIKE);
+                // § final.md §4 — taste drift: track unlikes to invalidate Hannah's cache
+                if (isLiked) onUnlike(currentSong.id);
+                toggleLike(currentSong);
+              }} style={miniBtn}>
                 <svg width="20" height="20" viewBox="0 0 24 24"
                   fill={isLiked ? '#1DB954' : 'none'}
                   stroke={isLiked ? '#1DB954' : 'rgba(255,255,255,0.5)'}
@@ -79,7 +86,7 @@ export default function BottomPlayer() {
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                 </svg>
               </button>
-              <button onClick={togglePlay} style={{ ...miniBtn, padding: 0, width: 34, height: 34 }}>
+              <button onClick={() => { haptic(HAPTIC.TAP); togglePlay(); }} style={{ ...miniBtn, padding: 0, width: 34, height: 34 }}>
                 {isLoading
                   ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.2)" /><path d="M12 2a10 10 0 0 1 10 10" /></svg>
                   : isPlaying
@@ -87,7 +94,7 @@ export default function BottomPlayer() {
                     : <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><polygon points="5,3 19,12 5,21" /></svg>
                 }
               </button>
-              <button onClick={next} style={miniBtn}>
+              <button onClick={() => { haptic(HAPTIC.TAP); next(); }} style={miniBtn}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)">
                   <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                 </svg>

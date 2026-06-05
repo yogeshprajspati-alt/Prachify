@@ -4,6 +4,7 @@ import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import { getTrending, getRecommendations, getDailyMix, getHiddenGems } from '../services/jiosaavn';
 import { SongScroll, SkeletonRow } from '../components/SongScroll';
+import { loadHannahsChoice, getCachedHannahsChoice } from '../services/hannahsChoice.js';
 
 const CACHE_TTL = 30 * 60 * 1000;
 const _homeCache = {};
@@ -32,9 +33,11 @@ export default function Home() {
   const [recommendations, setRecommendations] = useState([]);
   const [dailyMix, setDailyMix] = useState([]);
   const [hiddenGems, setHiddenGems] = useState([]);
+  const [hannahsSongs, setHannahsSongs] = useState([]);
   const [loadingRecs, setLoadingRecs] = useState(true);
   const [loadingMix, setLoadingMix] = useState(true);
   const [loadingGems, setLoadingGems] = useState(true);
+  const [loadingHannah, setLoadingHannah] = useState(true);
 
   const fetched = useRef(false);
 
@@ -97,6 +100,23 @@ export default function Home() {
         .finally(() => setLoadingGems(false));
     }
   }, []);  // eslint-disable-line
+
+  const fetchHannah = () => {
+    setLoadingHannah(true);
+    const cachedHannah = getCachedHannahsChoice();
+    if (cachedHannah && cachedHannah.length > 0) {
+      setHannahsSongs(cachedHannah);
+      setLoadingHannah(false);
+    } else {
+      loadHannahsChoice(likedSongObjects, recentObjects)
+        .then(songs => { if (songs) setHannahsSongs(songs); })
+        .finally(() => setLoadingHannah(false));
+    }
+  };
+
+  useEffect(() => {
+    fetchHannah();
+  }, [likedSongObjects.length]); // Re-evaluate when likes change
 
   // Sleek, compact quick-access tiles
   const statTiles = [
@@ -218,6 +238,60 @@ export default function Home() {
           }
         </Section>
       )}
+
+      {/* —— Hannah's Choice 🪄 —— */}
+      {(() => {
+        const totalSongs = likedSongObjects.length + recentObjects.length;
+        if (totalSongs < 5) {
+          // §4.1 — show progress hint for new users
+          return (
+            <Section title="Hannah's Choice 🪄">
+              <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ fontSize: 32 }}>🎵</div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                    Like {Math.max(0, 5 - totalSongs)} more songs to unlock
+                  </div>
+                  <div style={{ fontSize: 12, color: '#b3b3b3' }}>
+                    Hannah will recommend songs just for you
+                  </div>
+                </div>
+              </div>
+            </Section>
+          );
+        }
+        if (loadingHannah || hannahsSongs.length > 0) {
+          return (
+            <Section title="Hannah's Choice 🪄">
+              {loadingHannah
+                ? <SkeletonRow />
+                : <SongScroll songs={hannahsSongs} currentSong={currentSong} isPlaying={isPlaying}
+                    onPlay={song => playSong(song, { id: 'hannahs-choice', songs: hannahsSongs, title: "Hannah's Choice" })} />
+              }
+            </Section>
+          );
+        }
+        
+        // AI call failed or returned empty
+        return (
+          <Section title="Hannah's Choice 🪄">
+            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 32 }}>💤</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                  Hannah is resting
+                </div>
+                <div style={{ fontSize: 12, color: '#b3b3b3' }}>
+                  Couldn't fetch AI recommendations right now.{' '}
+                  <button onClick={fetchHannah} style={{ background: 'none', color: '#1DB954', border: 'none', padding: 0, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Try again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Section>
+        );
+      })()}
 
       {/* ── Smart Recommendations ── */}
       {(loadingRecs || recommendations.length > 0) && (

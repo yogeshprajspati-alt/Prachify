@@ -64,12 +64,16 @@ const usePlayerStore = create(
         // TASK-13: Cap jiosaavnCache at 100 entries at runtime (not just at persist time)
         // to prevent unbounded memory growth on long sessions.
         if (song?.source === 'jiosaavn') {
+          // P1 §3.4: Strip streamUrl before caching
+          const cachedSong = { ...song };
+          delete cachedSong.url;
+          
           set(s => {
             const entries = Object.entries(s.jiosaavnCache);
             const trimmed = entries.length >= 100
               ? Object.fromEntries(entries.slice(-99))
               : s.jiosaavnCache;
-            return { jiosaavnCache: { ...trimmed, [song.id]: song } };
+            return { jiosaavnCache: { ...trimmed, [cachedSong.id]: cachedSong } };
           });
         }
       },
@@ -194,11 +198,14 @@ const usePlayerStore = create(
           });
           syncUnlike(songObj.id);
         } else {
+          const songToSave = { ...songObj };
+          delete songToSave.url;
+          
           set({
             likedSongs: [songObj.id, ...likedSongs],
-            likedSongObjects: [songObj, ...likedSongObjects],
+            likedSongObjects: [songToSave, ...likedSongObjects],
           });
-          syncLike(songObj);
+          syncLike(songToSave);
         }
       },
 

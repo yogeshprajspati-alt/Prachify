@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import usePlayerStore from '../store/playerStore';
 import { searchSongs, getLyrics } from '../services/jiosaavn';
+import { onUnlike, fetchFullscreenAISuggestions } from '../services/hannahsChoice.js';
+import { haptic, HAPTIC } from '../utils/haptic.js';
 
 function LyricsView({ lines, position, duration, scrollRef }) {
   const currentIdx = duration > 0
@@ -109,23 +111,83 @@ export default function FullscreenPlayer({
     };
   }, []);
 
-  // ── Swipe gestures (only active in player tab, not queue) ────────────
+  // ── P3 §6: Liquid Slide Sheet (Gesture State Machine) ─────────────────
+  const sheetRef = useRef(null);
+  const [sheetState, setSheetState] = useState('OPEN'); // 'OPEN' | 'DRAGGING' | 'CLOSED'
+  const [dragY, setDragY] = useState(0);
   const touchStart = useRef(null);
+  const touchMoveTime = useRef(null);
+  const touchPrevY = useRef(null);
+
+  // Prevent background scroll interference
+  useEffect(() => {
+    const handleTouchMove = (e) => {
+      if (sheetState === 'DRAGGING') {
+        e.preventDefault(); // Lock scroll while dragging sheet
+      }
+    };
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => document.removeEventListener('touchmove', handleTouchMove);
+  }, [sheetState]);
+
   const onTouchStart = e => {
-    if (tab === 'queue' || tab === 'related') return; // let queue/related scroll freely
-    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  };
-  const onTouchEnd = e => {
-    if (tab === 'queue' || tab === 'related' || !touchStart.current) return;
-    const dx = e.changedTouches[0].clientX - touchStart.current.x;
-    const dy = e.changedTouches[0].clientY - touchStart.current.y;
-    touchStart.current = null;
-    if (Math.abs(dy) > Math.abs(dx)) {
-      if (dy > 80) onClose();        // swipe down → close
-    } else {
-      if (dx < -60) onNext();         // swipe left → next
-      if (dx > 60) onPrev();          // swipe right → prev
+    if (e.touches.length > 1) return; // ignore multi-touch
+    if (tab === 'queue' || tab === 'related' || tab === 'lyrics') {
+      // allow scrolling within these tabs unless we're dragging from the top handle
+      const target = e.target;
+      if (!target.closest('#drag-handle')) return;
     }
+    setSheetState('DRAGGING');
+    touchStart.current = { 
+      x: e.touches[0].clientX, 
+      y: e.touches[0].clientY,
+      time: Date.now()
+    };
+    touchPrevY.current = e.touches[0].clientY;
+    touchMoveTime.current = Date.now();
+  };
+
+  const onTouchMove = e => {
+    if (sheetState !== 'DRAGGING' || !touchStart.current) return;
+    const currentY = e.touches[0].clientY;
+    const dy = currentY - touchStart.current.y;
+    const dx = e.touches[0].clientX - touchStart.current.x;
+
+    // Only start vertical drag if dy > dx
+    if (Math.abs(dy) > Math.abs(dx)) {
+      if (dy > 0) { // Dragging down
+        setDragY(dy);
+      }
+    }
+    touchPrevY.current = currentY;
+    touchMoveTime.current = Date.now();
+  };
+
+  const onTouchEnd = e => {
+    if (!touchStart.current) return;
+    if (sheetState === 'DRAGGING') {
+      const currentY = e.changedTouches[0].clientY;
+      const elapsed = Date.now() - touchStart.current.time;
+      const velocity = elapsed > 0 ? Math.abs(currentY - touchStart.current.y) / elapsed : 0; // px/ms
+      const sheetHeight = window.innerHeight;
+      const percentDown = dragY / sheetHeight;
+
+      if (percentDown > 0.4 || velocity > 0.5) {
+        setSheetState('CLOSED');
+        setDragY(sheetHeight);
+        haptic(8); // Sheet snapped closed
+        setTimeout(() => onClose(), 300); // Wait for transition
+      } else {
+        setSheetState('OPEN');
+        setDragY(0);
+      }
+    } else {
+      // Horizontal swipes for next/prev
+      const dx = e.changedTouches[0].clientX - touchStart.current.x;
+      if (dx < -60) onNext();
+      if (dx > 60) onPrev();
+    }
+    touchStart.current = null;
   };
 
   // ── Album art pop animation on song change ───────────────────────────────
@@ -136,6 +198,8 @@ export default function FullscreenPlayer({
   }, [song?.id]);
 
   // ── Fetch "You might like" suggestions (queue tab) ──────────────────────
+  const aiAbortController = useRef(null);
+
   useEffect(() => {
     if (!song?.id || song.id === lastFetchedId.current) return;
     lastFetchedId.current = song.id;
@@ -143,19 +207,41 @@ export default function FullscreenPlayer({
     setSuggestions([]);
     setLoadingSuggestions(true);
 
-    const artistName = song.artist?.split(',')[0]?.trim();
-    if (!artistName) { setLoadingSuggestions(false); return; }
+    if (aiAbortController.current) {
+      aiAbortController.current.abort();
+    }
+    aiAbortController.current = new AbortController();
 
-    searchSongs(artistName, 10)
+    fetchFullscreenAISuggestions(song, aiAbortController.current.signal)
       .then(results => {
-        const queueIds = new Set(queue.map(s => s.id));
-        const filtered = results
-          .filter(s => s.id !== song.id && !queueIds.has(s.id))
-          .slice(0, 6);
-        setSuggestions(filtered);
+        if (results && results.length > 0) {
+          const queueIds = new Set(queue.map(s => s.id));
+          const filtered = results.filter(s => !queueIds.has(s.id));
+          setSuggestions(filtered);
+        } else {
+          // Fallback to artist search
+          const artistName = song.artist?.split(',')[0]?.trim();
+          if (artistName) {
+            searchSongs(artistName, 10).then(res => {
+              const queueIds = new Set(queue.map(s => s.id));
+              const filtered = res
+                .filter(s => s.id !== song.id && !queueIds.has(s.id))
+                .slice(0, 6);
+              setSuggestions(filtered);
+            }).catch(() => setSuggestions([]));
+          } else {
+            setSuggestions([]);
+          }
+        }
       })
       .catch(() => setSuggestions([]))
       .finally(() => setLoadingSuggestions(false));
+      
+    return () => {
+      if (aiAbortController.current) {
+        aiAbortController.current.abort();
+      }
+    };
   }, [song?.id]);
 
   // ── Fetch Related tab — only when tab is open (lazy) ─────────────────────
@@ -202,9 +288,16 @@ export default function FullscreenPlayer({
 
   return (
     <div
-      className="slide-up"
-      style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column', maxWidth: 430, margin: '0 auto', overflow: 'hidden', background: '#000' }}
+      ref={sheetRef}
+      className={sheetState === 'OPEN' && dragY === 0 ? "slide-up" : ""}
+      style={{ 
+        position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column', maxWidth: 430, margin: '0 auto', overflow: 'hidden', background: '#000',
+        transform: `translateY(${dragY}px)`,
+        transition: sheetState === 'DRAGGING' ? 'none' : 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        willChange: sheetState === 'DRAGGING' ? 'transform' : 'auto'
+      }}
       onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
       {/* ── Animated blurred album background ─────────────────────────── */}
@@ -214,7 +307,7 @@ export default function FullscreenPlayer({
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: '0 24px', paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}>
 
         {/* Drag handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 8px' }}>
+        <div id="drag-handle" style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 8px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.25)' }} />
         </div>
 
@@ -308,7 +401,12 @@ export default function FullscreenPlayer({
                 </button>
 
                 <button
-                  onClick={() => toggleLike(song)}
+                  onClick={() => {
+                    haptic(HAPTIC.LIKE);
+                    // § final.md §4 — taste drift: track unlikes for Hannah's cache
+                    if (isLiked) onUnlike(song.id);
+                    toggleLike(song);
+                  }}
                   style={{ ...ctrl, transition: 'transform 0.2s' }}
                   onMouseDown={e => e.currentTarget.style.transform = 'scale(0.8)'}
                   onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}

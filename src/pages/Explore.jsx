@@ -50,6 +50,7 @@ export default function Explore() {
     "Pretty Woman",
     "Main Koi Aisa Geet Gaoon",
     "Tumhe Jo Maine Dekha (From 'Main Hoon Na')",
+    "Dil Haara -from tashan",
     "Gulabi Aankhen - Sanam",
     "Tum Se Hi",
     "Sajni",

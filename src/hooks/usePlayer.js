@@ -2,7 +2,10 @@ import { useEffect, useRef, useCallback } from 'react';
 import usePlayerStore from '../store/playerStore';
 import * as audio from '../services/audioEngine';
 import { updateMediaSession, setMediaSessionHandlers, setMediaSessionState } from '../services/mediaSession';
-import { searchSongs } from '../services/jiosaavn';
+import { searchSongs, getSong } from '../services/jiosaavn';
+import { canPlaySong } from '../utils/languageFilter.js';
+import { logEvent } from '../utils/errorBus.js';
+import { showToast } from '../utils/toast.js';
 
 /**
  * Core player hook — bridges Zustand store ↔ Howler engine.
@@ -12,6 +15,10 @@ export function usePlayerEngine() {
   const store = usePlayerStore();
   const positionRaf = useRef(null);
   const playbackRate = usePlayerStore(s => s.playbackRate);
+  
+  // P2 §7: Gapless prefetch refs
+  const prefetchDone = useRef(false);
+  const prefetchingSongId = useRef(null);
 
   // Sync playback rate immediately when store changes
   useEffect(() => {
@@ -36,7 +43,34 @@ export function usePlayerEngine() {
         }
       }
 
-      if (dur > 0) setMediaSessionState('playing', pos, dur);
+      if (dur > 0) {
+        setMediaSessionState('playing', pos, dur);
+        
+        // P2 §7: Gapless Playback Prefetch (80% completion)
+        if (pos / dur >= 0.8 && !prefetchDone.current) {
+          prefetchDone.current = true;
+          const { queue, queueIndex } = usePlayerStore.getState();
+          if (queueIndex < queue.length - 1) {
+            const nextSong = queue[queueIndex + 1];
+            // Check network conditions (PWA Mobile Data Saver)
+            const conn = navigator.connection;
+            const shouldPrefetch = !conn || (!conn.saveData && !['slow-2g', '2g'].includes(conn.effectiveType));
+            
+            if (shouldPrefetch && nextSong.source === 'jiosaavn') {
+              getSong(nextSong.id).then(fullSong => {
+                if (fullSong && fullSong.url) {
+                  prefetchingSongId.current = nextSong.id;
+                  navigator.serviceWorker.controller?.postMessage({
+                    type: 'PREFETCH',
+                    url: fullSong.url,
+                    songId: nextSong.id,
+                  });
+                }
+              }).catch(() => {});
+            }
+          }
+        }
+      }
     }, 500); // 500ms is plenty for the seek bar and doesn't waste battery
   }, [store]);
 
@@ -44,9 +78,42 @@ export function usePlayerEngine() {
     clearInterval(positionRaf.current);
   }, []);
 
-  const playSong = useCallback((song, startPos = 0) => {
+  const playSong = useCallback(async (song, startPos = 0) => {
+    prefetchDone.current = false;
+    
+    // Cancel any in-flight prefetch if we're jumping to a new song manually
+    if (prefetchingSongId.current && prefetchingSongId.current !== song.id) {
+      navigator.serviceWorker.controller?.postMessage({
+        type: 'CANCEL_PREFETCH',
+        songId: prefetchingSongId.current
+      });
+      prefetchingSongId.current = null;
+    }
+    
     store.setCurrentSong(song);
-    audio.loadAndPlay(song.url, startPos);
+    
+    let playableUrl = song.url;
+    if (!playableUrl && song.source === 'jiosaavn') {
+      try {
+        const fullSong = await getSong(song.id);
+        if (fullSong && fullSong.url) {
+          playableUrl = fullSong.url;
+          song.url = playableUrl; // Temporarily attach it for this session
+        }
+      } catch (err) {
+        logEvent('playback_error', { songId: song.id, reason: 'failed_refetch_url' });
+        showToast('Failed to play song. Try again later.');
+        return;
+      }
+    }
+    
+    if (!playableUrl) {
+      logEvent('playback_error', { songId: song.id, reason: 'missing_url' });
+      showToast('Song unavailable.');
+      return;
+    }
+
+    audio.loadAndPlay(playableUrl, startPos);
     // Sync volume on new song
     const { volume, isMuted } = usePlayerStore.getState();
     audio.setVolume(isMuted ? 0 : volume);
@@ -177,8 +244,23 @@ export function usePlayerEngine() {
     const { currentSong, position, volume, isMuted } = usePlayerStore.getState();
     if (currentSong) {
       audio.setVolume(isMuted ? 0 : volume);
-      audio.loadOnly(currentSong.url, position || 0); // sirf load, auto-play nahi
-      updateMediaSession(currentSong);
+      
+      const loadSession = async () => {
+        let playableUrl = currentSong.url;
+        if (!playableUrl && currentSong.source === 'jiosaavn') {
+          try {
+            const fullSong = await getSong(currentSong.id);
+            if (fullSong && fullSong.url) playableUrl = fullSong.url;
+          } catch (e) {
+            console.error('Session restore failed to fetch url');
+          }
+        }
+        if (playableUrl) {
+          audio.loadOnly(playableUrl, position || 0);
+          updateMediaSession(currentSong);
+        }
+      };
+      loadSession();
       // UI ko paused state mein rakho — user manually play karega
       usePlayerStore.getState().setIsPlaying(false);
     }
@@ -238,6 +320,22 @@ export function usePlayer() {
       const idx = playlist.songs.findIndex((s) => s.id === song.id);
       store.setQueue(playlist.songs, idx >= 0 ? idx : 0, playlist.id);
     }
+
+    // § final.md §1.5 / §1.6 — language filter check AT PLAY TIME
+    // This catches offline-cached songs that pre-date the filter setting
+    if (!canPlaySong(song)) {
+      logEvent('filter_blocked_at_play', { songId: song.id, language: song.language });
+      showToast("This song doesn't match your language preferences");
+      // Skip to next — never leave user in silence
+      const nextSong = store.nextSong();
+      if (nextSong) {
+        // Re-call playSong so filter applies recursively through the queue
+        // (safe: queue is finite; filter should rarely trigger back-to-back)
+        setTimeout(() => playSong(nextSong), 0);
+      }
+      return;
+    }
+
     store.setCurrentSong(song);
     audio.loadAndPlay(song.url, 0);
     const { volume, isMuted } = usePlayerStore.getState();

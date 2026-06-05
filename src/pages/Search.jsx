@@ -4,6 +4,10 @@ import { usePlayer } from '../hooks/usePlayer';
 import usePlayerStore from '../store/playerStore';
 import { searchSongs, searchArtists } from '../services/jiosaavn';
 import SongRow from '../components/SongRow';
+import { createCache, normalizeKey, limits } from '../utils/lruCache.js';
+import { shouldBypassFilter, filterSongsByLanguage } from '../utils/languageFilter.js';
+import { optimizeWithCancel } from '../services/aiSearch.js';
+import { getOnlineStatus } from '../utils/offlineManager.js';
 
 const SONG_CATEGORIES = [
   { label: 'Bollywood', gradient: 'linear-gradient(135deg, #8A2387, #E94057)', query: 'latest bollywood hits premium' },
@@ -91,8 +95,9 @@ function formatDur(s) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 }
 
-const _searchCache = {};
-const _artistSearchCache = {};
+// LRU caches replace plain {} objects — device-adaptive limits + eviction
+const _searchCache = createCache('search', limits.search);
+const _artistSearchCache = createCache('artistSearch', 20);
 
 export default function Search() {
   const { currentSong, isPlaying, playSong } = usePlayer();
@@ -106,6 +111,8 @@ export default function Search() {
   const [results, setResults] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | searching | done | error
   const [errorMsg, setErrorMsg] = useState('');
+  const [aiStatus, setAiStatus] = useState('idle'); // idle | loading | refined | error
+  const [aiRefinedQuery, setAiRefinedQuery] = useState(''); // last AI-refined query shown as label
   
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -121,19 +128,24 @@ export default function Search() {
     setPage(1);
     setHasMore(true);
 
-    // Offline check
-    if (!navigator.onLine) {
+    // Offline check — use offlineManager (more reliable than direct navigator.onLine)
+    if (!getOnlineStatus()) {
       setStatus('error');
       setErrorMsg('No internet connection. Please check your network.');
       return;
     }
 
+    // Language filter bypass check — if user explicitly asked for a blocked language, skip filter
+    const bypass = shouldBypassFilter(q);
+
     // Cache check — instant results for repeat queries
+    const cacheKey = normalizeKey(q);
     const cache = searchType === 'artists' ? _artistSearchCache : _searchCache;
-    if (cache[q]) {
-      setResults(cache[q]);
-      setPage(Math.ceil(cache[q].length / 25));
-      if (cache[q].length % 25 !== 0) setHasMore(false);
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      setResults(cached);
+      setPage(Math.ceil(cached.length / 25));
+      if (cached.length % 25 !== 0) setHasMore(false);
       setStatus('done');
       return;
     }
@@ -153,8 +165,10 @@ export default function Search() {
         : await searchSongs(q, 25, 1);
         
       if (token.aborted) return;
-      cache[q] = data; // cache kar lo
-      setResults(data);
+      // § final.md §1 — apply language filter to results (unless user bypassed it explicitly)
+      const filtered = (searchType === 'songs' && !bypass) ? filterSongsByLanguage(data) : data;
+      cache.set(cacheKey, filtered); // LRU cache
+      setResults(filtered);
       if (data.length < 25) setHasMore(false);
       setStatus('done');
     } catch (err) {
@@ -178,6 +192,7 @@ export default function Search() {
     setLoadingMore(true);
     const nextPage = page + 1;
     const cache = searchType === 'artists' ? _artistSearchCache : _searchCache;
+    const cacheKey = normalizeKey(query);
 
     const fetchPromise = searchType === 'artists' 
       ? searchArtists(query, 25, nextPage) 
@@ -186,8 +201,9 @@ export default function Search() {
     fetchPromise
       .then(newResults => {
         if (newResults.length < 25) setHasMore(false);
-        const combined = [...results, ...newResults];
-        cache[query] = combined; // update cache
+        const existing = cache.get(cacheKey) || [];
+        const combined = [...existing, ...newResults];
+        cache.set(cacheKey, combined); // update LRU cache
         setResults(combined);
         setPage(nextPage);
       })
@@ -204,7 +220,33 @@ export default function Search() {
     return () => clearTimeout(debounceRef.current);
   }, [query, searchType, doSearch, setSearchParams]);
 
-  const clear = () => { setQuery(''); setResults([]); setStatus('idle'); setSearchParams({}); inputRef.current?.focus(); };
+  // AI ✨ button handler — 500ms debounce built into optimizeWithCancel
+  const aiDebounceRef = useRef(null);
+  const handleAISearch = useCallback(async () => {
+    if (!query.trim()) return; // §2.4 — never send empty query
+    if (!getOnlineStatus()) return; // §2.5 — offline guard
+    if (aiStatus === 'loading') return;
+
+    setAiStatus('loading');
+    try {
+      const { query: refined, wasRefined } = await optimizeWithCancel(query);
+      if (wasRefined && refined !== query) {
+        setAiRefinedQuery(refined);
+        setQuery(refined);         // auto-execute refined query
+        setAiStatus('refined');
+      } else {
+        setAiStatus('idle');       // no change — silent
+      }
+    } catch {
+      setAiStatus('error');
+      setTimeout(() => setAiStatus('idle'), 2000);
+    }
+  }, [query, aiStatus]);
+
+  // Reset AI status when query changes manually
+  useEffect(() => { setAiStatus('idle'); setAiRefinedQuery(''); }, [query]);
+
+  const clear = () => { setQuery(''); setResults([]); setStatus('idle'); setSearchParams({}); setAiStatus('idle'); setAiRefinedQuery(''); inputRef.current?.focus(); };
 
   const handlePlay = (song) => {
     playSong(song, { id: 'search-results', songs: results, title: 'Search Results' });
@@ -216,7 +258,7 @@ export default function Search() {
         <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Search</h1>
 
         {/* Search input */}
-        <div style={{ position: 'relative', marginBottom: 20 }}>
+        <div style={{ position: 'relative', marginBottom: query ? 8 : 20 }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
             style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', zIndex: 1 }}>
             <circle cx="11" cy="11" r="8" stroke="#121212" strokeWidth="2.5"/>
@@ -250,6 +292,40 @@ export default function Search() {
             </button>
           )}
         </div>
+
+        {/* AI Search button row — visible when query is non-empty */}
+        {query.trim() && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <button
+              id="ai-search-btn"
+              onClick={handleAISearch}
+              disabled={aiStatus === 'loading' || !getOnlineStatus()}
+              title={!getOnlineStatus() ? 'AI search requires internet' : 'Refine with AI'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: aiStatus === 'refined' ? 'rgba(29,185,84,0.15)' : 'rgba(255,255,255,0.08)',
+                border: `1px solid ${aiStatus === 'refined' ? 'rgba(29,185,84,0.4)' : 'rgba(255,255,255,0.15)'}`,
+                borderRadius: 24, padding: '5px 14px', cursor: aiStatus === 'loading' ? 'default' : 'pointer',
+                fontSize: 13, fontWeight: 600, color: aiStatus === 'refined' ? '#1DB954' : '#fff',
+                opacity: (!getOnlineStatus() || aiStatus === 'loading') ? 0.5 : 1,
+                transition: 'all 0.2s', fontFamily: 'inherit',
+              }}
+            >
+              {aiStatus === 'loading' ? (
+                <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid #333', borderTop: '2px solid #1DB954', animation: 'spin 0.7s linear infinite' }} />
+              ) : (
+                <span style={{ fontSize: 14 }}>✨</span>
+              )}
+              {aiStatus === 'loading' ? 'Refining...' : aiStatus === 'refined' ? 'Refined by AI' : 'AI Search'}
+            </button>
+            {aiStatus === 'refined' && aiRefinedQuery && (
+              <span style={{ fontSize: 12, color: '#b3b3b3' }}>
+                Showing results for "{aiRefinedQuery}"
+              </span>
+            )}
+          </div>
+        )}
+
         
         {/* Toggle Songs/Artists */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
