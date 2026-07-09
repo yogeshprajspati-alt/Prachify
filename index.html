@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+  <!-- Theme & App Colors -->
+  <meta name="theme-color" content="#0B0B0F" />
+  <meta name="background-color" content="#0B0B0F" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- SEO Optimization Meta Tags -->
+  <title>Geet — Your Personal Music Space</title>
+  <meta name="description"
+    content="An intimate, premium, minimalist music streaming web application curated specifically for late-night emotional vibes." />
+
+  <!-- Open Graph for social previews -->
+  <meta property="og:title" content="Geet" />
+  <meta property="og:description" content="Your personal late-night music space 🎧" />
+  <meta property="og:type" content="website" />
+
+  <!-- Preconnect Google Fonts for rapid delivery -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- TASK-09: Preconnect to JioSaavn API — starts DNS+TLS before first search/home call -->
+  <link rel="preconnect" href="https://jiosaavn-api-9pw6.onrender.com" />
+</head>
+
+<body class="bg-[#0B0B0F]">
+  <div id="root">
+    <div id="splash" style="
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0B0B0F;
+      z-index: 9999;
+      gap: 28px;
+      font-family: 'Inter', sans-serif;
+    ">
+      <!-- Logo -->
+      <div style="
+        animation: splashLogoIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        filter: drop-shadow(0 0 32px rgba(200, 100, 255, 0.5));
+      ">
+        <img
+          src="/prachify-logo.png"
+          alt="Geet"
+          style="width: 120px; height: 120px; object-fit: contain;"
+        />
+      </div>
+
+      <!-- App name + tagline -->
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        animation: splashTextIn 0.7s ease both;
+        animation-delay: 0.35s;
+        opacity: 0;
+      ">
+        <h1 style="
+          font-size: 28px;
+          font-weight: 800;
+          margin: 0;
+          background: linear-gradient(135deg, #FF7EB6, #9D7CFF);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          letter-spacing: -0.5px;
+        ">Geet</h1>
+        <p style="
+          font-size: 10px;
+          color: #50506A;
+          text-transform: uppercase;
+          letter-spacing: 3.5px;
+          font-weight: 600;
+          margin: 0;
+        ">for when the world is quiet</p>
+      </div>
+
+      <!-- Bottom loading bar -->
+      <div style="
+        position: absolute;
+        bottom: 48px;
+        width: 48px;
+        height: 2px;
+        background: rgba(255,255,255,0.06);
+        border-radius: 2px;
+        overflow: hidden;
+        animation: splashBarIn 0.4s ease both;
+        animation-delay: 0.6s;
+        opacity: 0;
+      ">
+        <div style="
+          height: 100%;
+          background: linear-gradient(90deg, #FF7EB6, #9D7CFF);
+          border-radius: 2px;
+          animation: splashBarFill 1.2s ease both;
+          animation-delay: 0.7s;
+        "></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.jsx"></script>
+
+  <style>
+    @keyframes splashLogoIn {
+      from {
+        opacity: 0;
+        transform: scale(0.7);
+        filter: drop-shadow(0 0 0px rgba(200, 100, 255, 0));
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+        filter: drop-shadow(0 0 32px rgba(200, 100, 255, 0.5));
+      }
+    }
+
+    @keyframes splashTextIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes splashBarIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    @keyframes splashBarFill {
+      from { width: 0%; }
+      to   { width: 100%; }
+    }
+
+    /* Neon glow pulse — logo pe subtle breathing effect */
+    @keyframes splashGlow {
+      0%, 100% { filter: drop-shadow(0 0 24px rgba(200, 100, 255, 0.4)); }
+      50%       { filter: drop-shadow(0 0 48px rgba(255, 126, 182, 0.7)); }
+    }
+  </style>
+  <script>
+    // Logo load hone ke baad glow pulse start karo
+    window.addEventListener('load', function() {
+      const logoDiv = document.querySelector('#splash > div:first-child');
+      if (logoDiv) {
+        setTimeout(() => {
+          logoDiv.style.animation = 'splashGlow 2s ease-in-out infinite';
+        }, 900); // initial animation khatam hone ke baad
+      }
+    });
+  </script>
+</body>
+
+</html>

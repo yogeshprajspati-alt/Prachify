@@ -1,0 +1,147 @@
+import { Howl } from 'howler';
+
+/**
+ * Singleton audio engine — ONE Howl instance for the entire app lifetime.
+ * Never create another Howl elsewhere.
+ */
+
+let howl = null;
+let currentUrl = null;
+
+const callbacks = {
+  onPlay: null,
+  onPause: null,
+  onEnd: null,
+  onLoad: null,
+  onSeek: null,
+  onError: null,
+};
+
+export function setCallbacks(cbs) {
+  Object.assign(callbacks, cbs);
+}
+
+export function loadAndPlay(url, startPosition = 0) {
+  // Same URL already playing — double-play guard
+  if (howl && currentUrl === url && howl.playing()) {
+    return;
+  }
+
+  // Same URL but paused — seek aur play karo, naya instance mat banao
+  if (howl && currentUrl === url && !howl.playing()) {
+    howl.seek(startPosition);
+    howl.play();
+    return;
+  }
+
+  // Naya song — pehla unload karo
+  if (howl) {
+    howl.unload();
+    howl = null;
+  }
+
+  currentUrl = url;
+
+  howl = new Howl({
+    src: [url],
+    html5: true,
+    preload: true,
+    volume: 1.0,
+    onplay: () => callbacks.onPlay?.(),
+    onpause: () => callbacks.onPause?.(),
+    onend: () => callbacks.onEnd?.(),
+    onload: () => {
+      if (startPosition > 0) howl.seek(startPosition);
+      callbacks.onLoad?.(howl.duration());
+    },
+    onloaderror: (id, err) => callbacks.onError?.(err),
+    onplayerror: (id, err) => {
+      howl.once('unlock', () => howl.play());
+      callbacks.onError?.(err);
+    },
+    onseek: () => callbacks.onSeek?.(),
+  });
+
+  howl.play();
+}
+
+// Sirf load karo — play mat karo (startup ke liye)
+// Full callbacks wired karo — taaki user Play dabaye toh onPlay fire ho aur UI update ho
+export function loadOnly(url, startPosition = 0) {
+  if (howl) {
+    howl.unload();
+    howl = null;
+  }
+  currentUrl = url;
+  howl = new Howl({
+    src: [url],
+    html5: true,
+    preload: true,
+    volume: 1.0,
+    onplay: () => callbacks.onPlay?.(),
+    onpause: () => callbacks.onPause?.(),
+    onend: () => callbacks.onEnd?.(),
+    onload: () => {
+      howl.seek(startPosition);
+      callbacks.onLoad?.(howl.duration());
+    },
+    onloaderror: (id, err) => callbacks.onError?.(err),
+    onplayerror: (id, err) => {
+      howl.once('unlock', () => howl.play());
+      callbacks.onError?.(err);
+    },
+    onseek: () => callbacks.onSeek?.(),
+  });
+  // play() intentionally nahi hai — startup pe paused rehna chahiye
+}
+
+export function play() { howl?.play(); }
+export function pause() { howl?.pause(); }
+export function hasHowl() { return howl !== null; }
+
+export function seek(seconds) {
+  if (howl) howl.seek(seconds);
+}
+
+export function setVolume(vol) {
+  if (howl) howl.volume(vol);
+  if (typeof window !== 'undefined' && window.Howler) {
+    window.Howler.volume(vol);
+  }
+}
+
+export function getPosition() {
+  if (!howl) return 0;
+  const pos = howl.seek();
+  return typeof pos === 'number' ? pos : 0;
+}
+
+export function getDuration() {
+  if (!howl) return 0;
+  const dur = howl.duration();
+  return typeof dur === 'number' ? dur : 0;
+}
+
+export function isPlaying() {
+  return howl ? howl.playing() : false;
+}
+
+export function unload() {
+  if (howl) {
+    howl.unload();
+    howl = null;
+    currentUrl = null;
+  }
+}
+
+export function setPlaybackRate(rate) {
+  if (!howl) return;
+  // Howler HTML5 mode mein _sounds[0]._node = actual <audio> element
+  const node = howl?._sounds?.[0]?._node;
+  if (node) node.playbackRate = rate;
+}
+
+export function getPlaybackRate() {
+  const node = howl?._sounds?.[0]?._node;
+  return node?.playbackRate ?? 1.0;
+}
