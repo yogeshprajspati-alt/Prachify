@@ -210,6 +210,7 @@ export default function App() {
             width: 54,
             height: 54,
             borderRadius: '50%',
+             overflow: 'hidden',
             background: '#282828',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
@@ -225,9 +226,7 @@ export default function App() {
           onTouchStart={e => e.currentTarget.style.transform = 'scale(0.9)'}
           onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
         >
-          <span style={{ fontSize: 28, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))', transform: 'translateY(-1px)' }}>
-            🌸
-          </span>
+          <img src="/hannah-avatar.png" alt="Hannah" onError={e => e.currentTarget.style.display='none'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
         </button>
 
         {/* Lazy Loaded Chat Interface */}

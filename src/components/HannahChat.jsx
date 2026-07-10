@@ -198,11 +198,11 @@ export default function HannahChat() {
           </button>
           
           <div style={{
-            width: 40, height: 40, borderRadius: '50%', background: '#282828',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)'
-          }}>
-            🌸
-          </div>
+  width: 40, height: 40, borderRadius: '50%', background: '#282828',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)'
+}}>
+  <img src="/hannah-avatar.png" alt="Hannah" onError={e => e.currentTarget.style.display='none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+</div>
           
           <div style={{ marginLeft: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Hannah</div>
@@ -239,9 +239,10 @@ export default function HannahChat() {
           return (
             <div key={i} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
               {!isUser && (
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginRight: 8, marginTop: 'auto', marginBottom: 4 }}>
-                  🌸
-                </div>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 8, marginTop: 'auto', marginBottom: 4 }}>
+                <img src="/hannah-avatar.png" alt="" onError={e => e.currentTarget.style.display='none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+
+            </div>
               )}
               <div style={{
                 maxWidth: '75%',
@@ -263,9 +264,9 @@ export default function HannahChat() {
         
         {isTyping && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, marginRight: 8, marginTop: 'auto', marginBottom: 4 }}>
-              🌸
-            </div>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#282828', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginRight: 8, marginTop: 'auto', marginBottom: 4 }}>
+  <img src="/hannah-avatar.png" alt="" onError={e => e.currentTarget.style.display='none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+</div>
             <div style={{
               padding: '12px 16px', borderRadius: '16px 16px 16px 4px', background: '#282828', display: 'flex', gap: 4, alignItems: 'center'
             }}>
