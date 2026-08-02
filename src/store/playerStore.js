@@ -13,18 +13,35 @@ import { getActiveProfileId, getProfileById } from './profileStore';
 const profileScopedStorage = {
   getItem: (name) => {
     const profileId = getActiveProfileId() || 'no-profile';
-    // Use v8 namespace to enforce a clean slate, guaranteed safe by main.jsx reload
     const newKey = `${name}::v8::${profileId}`;
     let data = localStorage.getItem(newKey);
     
-    // If it's Prachi and she doesn't have v8 data yet, migrate her old data
-    if (!data && profileId === 'prachi') {
-      const keysToTry = ['v6', 'v3', 'v2'];
-      for (const ver of keysToTry) {
-        data = localStorage.getItem(ver === 'v2' ? `${name}::${profileId}` : `${name}::${ver}::${profileId}`);
-        if (data) {
-          localStorage.setItem(newKey, data);
-          break;
+    // If it's Prachi or Deepak and they don't have v8 data yet, migrate legacy local data
+    if (!data && (profileId === 'prachi' || profileId === 'deepak')) {
+      const keysToTry = [
+        `${name}::v6::${profileId}`,
+        `${name}::v3::${profileId}`,
+        `${name}::${profileId}`,
+        name, // legacy un-scoped key e.g. 'prachify-v2'
+        'prachify-v6',
+        'prachify-v3',
+        'prachify-player-storage'
+      ];
+      for (const key of keysToTry) {
+        const item = localStorage.getItem(key);
+        if (item) {
+          try {
+            const parsed = JSON.parse(item);
+            if (parsed && typeof parsed === 'object') {
+              // Ensure it is wrapped in Zustand persist structure { state: { ... }, version: 0 }
+              const formatted = parsed.state ? item : JSON.stringify({ state: parsed, version: 0 });
+              data = formatted;
+              localStorage.setItem(newKey, data);
+              break;
+            }
+          } catch {
+            // invalid JSON, ignore
+          }
         }
       }
     }
@@ -261,8 +278,10 @@ const usePlayerStore = create(
 
       // Load liked songs from DB on startup
       hydrateLikedFromDB: async () => {
+        const profileAtStart = getActiveProfileId();
         const dbSongs = await fetchLikedSongs();
         if (!dbSongs) return;
+        if (getActiveProfileId() !== profileAtStart) return;
 
         const localLikedSongObjects = get().likedSongObjects || [];
         const dbSongIds = new Set(dbSongs.map(s => s.id));
@@ -276,10 +295,12 @@ const usePlayerStore = create(
           }
         }
 
-        set({
-          likedSongs: mergedSongs.map(s => s.id),
-          likedSongObjects: mergedSongs,
-        });
+        if (getActiveProfileId() === profileAtStart) {
+          set({
+            likedSongs: mergedSongs.map(s => s.id),
+            likedSongObjects: mergedSongs,
+          });
+        }
       },
 
       // ── Custom Playlists ──────────────────────────────────────────────────
@@ -401,8 +422,10 @@ const usePlayerStore = create(
       },
 
       hydratePlaylistsFromDB: async () => {
+        const profileAtStart = getActiveProfileId();
         const dbPlaylists = await fetchPlaylists();
         if (!dbPlaylists) return;
+        if (getActiveProfileId() !== profileAtStart) return;
 
         const localPlaylists = get().customPlaylists || [];
         const mergedPlaylists = [...dbPlaylists];
@@ -434,7 +457,9 @@ const usePlayerStore = create(
           }
         }
 
-        set({ customPlaylists: mergedPlaylists });
+        if (getActiveProfileId() === profileAtStart) {
+          set({ customPlaylists: mergedPlaylists });
+        }
       },
 
       // ── Shared "Family" Playlist ─────────────────────────────────────────
@@ -545,14 +570,70 @@ const usePlayerStore = create(
         isMuted: s.isMuted,
         playbackRate: s.playbackRate,
         jiosaavnCache: (() => {
-          const entries = Object.entries(s.jiosaavnCache);
+          const entries = Object.entries(s.jiosaavnCache || {});
           return entries.length > 100
             ? Object.fromEntries(entries.slice(-100))
             : s.jiosaavnCache;
         })(),
       }),
+      merge: (persistedState, currentState) => {
+        const p = (persistedState && typeof persistedState === 'object') ? persistedState : {};
+        return {
+          ...currentState,
+          ...p,
+          playlists: Array.isArray(p.playlists) ? p.playlists : (currentState.playlists || []),
+          customPlaylists: Array.isArray(p.customPlaylists) ? p.customPlaylists : [],
+          recentSongs: Array.isArray(p.recentSongs) ? p.recentSongs : [],
+          likedSongs: Array.isArray(p.likedSongs) ? p.likedSongs : [],
+          likedSongObjects: Array.isArray(p.likedSongObjects) ? p.likedSongObjects : [],
+          skippedSongs: (p.skippedSongs && typeof p.skippedSongs === 'object') ? p.skippedSongs : {},
+          jiosaavnCache: (p.jiosaavnCache && typeof p.jiosaavnCache === 'object') ? p.jiosaavnCache : {},
+          queue: Array.isArray(p.queue) ? p.queue : [],
+          sharedPlaylist: (p.sharedPlaylist && typeof p.sharedPlaylist === 'object' && Array.isArray(p.sharedPlaylist.songs))
+            ? p.sharedPlaylist
+            : currentState.sharedPlaylist,
+        };
+      },
     }
   )
 );
+
+export function loadProfileState(profileId) {
+  if (!profileId) return;
+  const raw = profileScopedStorage.getItem('prachify-v2');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const p = parsed.state || parsed;
+      usePlayerStore.setState({
+        currentSong: null,
+        isPlaying: false,
+        queue: [],
+        queueIndex: -1,
+        position: 0,
+        customPlaylists: Array.isArray(p.customPlaylists) ? p.customPlaylists : [],
+        likedSongs: Array.isArray(p.likedSongs) ? p.likedSongs : [],
+        likedSongObjects: Array.isArray(p.likedSongObjects) ? p.likedSongObjects : [],
+        recentSongs: Array.isArray(p.recentSongs) ? p.recentSongs : [],
+        skippedSongs: (p.skippedSongs && typeof p.skippedSongs === 'object') ? p.skippedSongs : {},
+        jiosaavnCache: (p.jiosaavnCache && typeof p.jiosaavnCache === 'object') ? p.jiosaavnCache : {},
+      });
+      return;
+    } catch (e) {}
+  }
+
+  usePlayerStore.setState({
+    currentSong: null,
+    isPlaying: false,
+    queue: [],
+    queueIndex: -1,
+    position: 0,
+    customPlaylists: [],
+    likedSongs: [],
+    likedSongObjects: [],
+    recentSongs: [],
+    skippedSongs: {},
+  });
+}
 
 export default usePlayerStore;

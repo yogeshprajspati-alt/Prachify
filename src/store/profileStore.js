@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { loadProfileState } from './playerStore';
 
 // ─── Profile Definitions ─────────────────────────────────────────────────────
 // Each profile gets its own isolated library (playlists, liked songs, recents)
@@ -80,13 +81,20 @@ const useProfileStore = create(
       // pattern used by every profile-based app).
       selectProfile: (id) => {
         if (!getProfileById(id)) return;
+        // Synchronously load player state for selected profile BEFORE updating activeProfileId
+        loadProfileState(id);
         set({ activeProfileId: id });
-        window.location.reload();
+        try {
+          localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify({ state: { activeProfileId: id }, version: 0 }));
+        } catch {}
       },
 
       switchProfile: () => {
+        loadProfileState(null);
         set({ activeProfileId: null });
-        window.location.reload();
+        try {
+          localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify({ state: { activeProfileId: null }, version: 0 }));
+        } catch {}
       },
     }),
     {

@@ -86,6 +86,11 @@ function ProfileCard({ profile, onSelect }) {
 export default function ProfileSelector({ isModal = false, onClose }) {
   const selectProfile = useProfileStore(s => s.selectProfile);
 
+  const handleSelect = (id) => {
+    selectProfile(id);
+    if (onClose) onClose();
+  };
+
   return (
     <div
       style={{
@@ -146,7 +151,7 @@ export default function ProfileSelector({ isModal = false, onClose }) {
         justifyItems: 'center',
       }}>
         {PROFILES.map(profile => (
-          <ProfileCard key={profile.id} profile={profile} onSelect={selectProfile} />
+          <ProfileCard key={profile.id} profile={profile} onSelect={handleSelect} />
         ))}
       </div>
     </div>

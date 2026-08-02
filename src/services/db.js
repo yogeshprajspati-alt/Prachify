@@ -98,8 +98,38 @@ export async function syncUnlike(songId) {
 export async function fetchLikedSongs() {
   if (!ENABLED || isGuest()) return null;
   const userId = getUserId();
-  const data = await supabase(`user_tracks?user_id=eq.${userId}&order=created_at.desc`);
-  return data?.map(row => row.song_data) || [];
+  const profileId = getActiveProfileId();
+
+  let targetUserIds = [userId];
+  if (profileId === 'prachi' || profileId === 'deepak') {
+    targetUserIds = Array.from(new Set([userId, 'prachify_admin', 'prachify_user', 'prachify_default', 'prachify_prachi']));
+  }
+
+  const orCondition = targetUserIds.map(id => `user_id.eq.${id}`).join(',');
+  const query = `user_tracks?or=(${orCondition})&order=created_at.desc`;
+
+  const data = await supabase(query);
+  if (data === null) return null; // Return null on DB error so local state isn't wiped
+
+  const uniqueSongs = [];
+  const seenIds = new Set();
+
+  for (const row of data) {
+    const songData = row.song_data;
+    if (songData && songData.id && !seenIds.has(songData.id)) {
+      seenIds.add(songData.id);
+      uniqueSongs.push(songData);
+      if (row.user_id !== userId) {
+        supabase('user_tracks?on_conflict=user_id,song_id', 'POST', {
+          user_id: userId,
+          song_id: songData.id,
+          song_data: songData,
+        }).catch(() => {});
+      }
+    }
+  }
+
+  return uniqueSongs;
 }
 
 // ── Playlists ────────────────────────────────────────────────────────────────
@@ -124,8 +154,55 @@ export async function deletePlaylistFromDB(playlistId) {
 export async function fetchPlaylists() {
   if (!ENABLED || isGuest()) return null;
   const userId = getUserId();
-  const data = await supabase(`user_playlists?user_id=eq.${userId}&order=updated_at.desc`);
-  return data?.map(row => row.playlist_data) || [];
+  const profileId = getActiveProfileId();
+
+  // Self-healing for Chanchal: purge any accidental cross-synced legacy playlists/tracks in Supabase & LocalStorage
+  if (profileId === 'chanchal') {
+    const data = await supabase(`user_playlists?user_id=eq.${userId}&order=updated_at.desc`);
+    if (data && data.length > 0) {
+      // If any of the rows contain legacy playlists (e.g. Prachi's Playlist or Saved Songs), purge Chanchal's DB rows & local storage
+      const hasAccidental = data.some(r => r.playlist_data?.title?.toLowerCase().includes('prachi') || r.playlist_data?.title?.toLowerCase().includes('saved') || r.playlist_data?.title?.toLowerCase().includes('old'));
+      if (hasAccidental) {
+        await supabase(`user_playlists?user_id=eq.${userId}`, 'DELETE');
+        await supabase(`user_tracks?user_id=eq.${userId}`, 'DELETE');
+        try { localStorage.removeItem('prachify-v2::v8::chanchal'); } catch {}
+        return [];
+      }
+    }
+    return data?.map(row => row.playlist_data) || [];
+  }
+
+  let targetUserIds = [userId];
+  if (profileId === 'prachi' || profileId === 'deepak') {
+    targetUserIds = Array.from(new Set([userId, 'prachify_admin', 'prachify_user', 'prachify_default', 'prachify_prachi']));
+  }
+
+  const orCondition = targetUserIds.map(id => `user_id.eq.${id}`).join(',');
+  const query = `user_playlists?or=(${orCondition})&order=updated_at.desc`;
+
+  const data = await supabase(query);
+  if (data === null) return null; // Return null on DB error so local state isn't wiped
+
+  const uniquePlaylists = [];
+  const seenIds = new Set();
+
+  for (const row of data) {
+    const plData = row.playlist_data;
+    if (plData && plData.id && !seenIds.has(plData.id)) {
+      seenIds.add(plData.id);
+      uniquePlaylists.push(plData);
+      if (row.user_id !== userId) {
+        supabase('user_playlists?on_conflict=user_id,playlist_id', 'POST', {
+          user_id: userId,
+          playlist_id: plData.id,
+          playlist_data: plData,
+          updated_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    }
+  }
+
+  return uniquePlaylists;
 }
 
 export { ENABLED as dbEnabled };
