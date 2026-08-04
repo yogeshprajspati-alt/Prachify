@@ -10,6 +10,7 @@ export default function Library() {
   const navigate = useNavigate();
   const customPlaylists = usePlayerStore(s => s.customPlaylists);
   const likedSongs = usePlayerStore(s => s.likedSongs);
+  const recentSongs = usePlayerStore(s => s.recentSongs);
   const sharedPlaylist = usePlayerStore(s => s.sharedPlaylist);
   const createPlaylist = usePlayerStore(s => s.createPlaylist);
   const activeProfileId = useProfileStore(s => s.activeProfileId);
@@ -83,6 +84,20 @@ export default function Library() {
         <div style={{ textAlign: 'left', flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Liked Songs</div>
           <div style={{ fontSize: 12, color: '#b3b3b3' }}>Playlist · {likedSongs.length} songs</div>
+        </div>
+      </button>
+
+      {/* Recently Played History */}
+      <button onClick={() => navigate('/playlist/history')} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 16px', marginBottom: 4 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 6, background: 'linear-gradient(135deg, #a855f7, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div style={{ textAlign: 'left', flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Listening History</div>
+          <div style={{ fontSize: 12, color: '#b3b3b3' }}>History · {recentSongs.length} played</div>
         </div>
       </button>
 

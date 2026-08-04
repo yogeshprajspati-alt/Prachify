@@ -79,6 +79,7 @@ export function usePlayerEngine() {
   }, []);
 
   const playSong = useCallback(async (song, startPos = 0) => {
+    if (!song) return;
     prefetchDone.current = false;
     
     // Cancel any in-flight prefetch if we're jumping to a new song manually
@@ -91,24 +92,14 @@ export function usePlayerEngine() {
     }
     
     store.setCurrentSong(song);
+    store.setIsLoading(true);
     
-    let playableUrl = song.url;
-    if (!playableUrl && song.source === 'jiosaavn') {
-      try {
-        const fullSong = await getSong(song.id);
-        if (fullSong && fullSong.url) {
-          playableUrl = fullSong.url;
-          song.url = playableUrl; // Temporarily attach it for this session
-        }
-      } catch (err) {
-        logEvent('playback_error', { songId: song.id, reason: 'failed_refetch_url' });
-        showToast('Failed to play song. Try again later.');
-        return;
-      }
-    }
+    const playableUrl = await getPlayableSongUrl(song);
     
     if (!playableUrl) {
       logEvent('playback_error', { songId: song.id, reason: 'missing_url' });
+      store.setIsLoading(false);
+      store.setHasError(true);
       showToast('Song unavailable.');
       return;
     }
@@ -282,6 +273,21 @@ export function usePlayerEngine() {
   return { playSong, handleNext, handlePrev };
 }
 
+async function getPlayableSongUrl(song) {
+  if (song?.url) return song.url;
+  if (!song || !song.id) return null;
+  try {
+    const fullSong = await getSong(song.id);
+    if (fullSong && fullSong.url) {
+      song.url = fullSong.url; // Attach for current session
+      return fullSong.url;
+    }
+  } catch (err) {
+    console.error('[usePlayer] Failed to refetch stream URL for song:', song.id, err);
+  }
+  return null;
+}
+
 /**
  * Lightweight hook for components — reads store + gets action funcs.
  */
@@ -302,7 +308,13 @@ export function usePlayer() {
       if (!audio.hasHowl() && currentSong) {
         store.setIsLoading(true);
         store.setHasError(false);
-        audio.loadAndPlay(currentSong.url, position || 0);
+        getPlayableSongUrl(currentSong).then(url => {
+          if (url) audio.loadAndPlay(url, position || 0);
+          else {
+            store.setIsLoading(false);
+            store.setHasError(true);
+          }
+        });
       } else {
         audio.play();
       }
@@ -325,37 +337,42 @@ export function usePlayer() {
     audio.setVolume(!isMuted ? 0 : volume);
   }, [store]);
 
-  const playSong = useCallback((song, playlist = null) => {
+  const playSong = useCallback(async (song, playlist = null) => {
+    if (!song) return;
+
     if (playlist) {
       const idx = playlist.songs.findIndex((s) => s.id === song.id);
       store.setQueue(playlist.songs, idx >= 0 ? idx : 0, playlist.id);
     }
 
     // § final.md §1.5 / §1.6 — language filter check AT PLAY TIME
-    // This catches offline-cached songs that pre-date the filter setting
     if (!canPlaySong(song)) {
       logEvent('filter_blocked_at_play', { songId: song.id, language: song.language });
       showToast("This song doesn't match your language preferences");
-      // Skip to next — never leave user in silence
       const nextSong = store.nextSong();
       if (nextSong) {
-        // Re-call playSong so filter applies recursively through the queue
-        // (safe: queue is finite; filter should rarely trigger back-to-back)
         setTimeout(() => playSong(nextSong), 0);
       }
       return;
     }
 
     store.setCurrentSong(song);
-    audio.loadAndPlay(song.url, 0);
+    store.setIsLoading(true);
+
+    const playableUrl = await getPlayableSongUrl(song);
+    if (!playableUrl) {
+      store.setIsLoading(false);
+      store.setHasError(true);
+      showToast('Failed to play song. Stream URL unavailable.');
+      return;
+    }
+
+    audio.loadAndPlay(playableUrl, 0);
     const { volume, isMuted } = usePlayerStore.getState();
     audio.setVolume(isMuted ? 0 : volume);
     updateMediaSession(song);
 
     // Timeout to break out of infinite loading if CDN is blocked.
-    // getDuration() === 0 confirms song never loaded at all.
-    // If duration > 0, song loaded successfully — isPlaying() may be false
-    // due to browser background throttling, not an actual error. Do not unload.
     setTimeout(() => {
       const state = usePlayerStore.getState();
       if (state.isLoading && state.currentSong?.id === song.id && !audio.isPlaying() && audio.getDuration() === 0) {
@@ -367,16 +384,11 @@ export function usePlayer() {
   }, [store]);
 
   const playPlaylist = useCallback((playlist, startIndex = 0) => {
+    if (!playlist || !playlist.songs || playlist.songs.length === 0) return;
     store.setQueue(playlist.songs, startIndex, playlist.id);
     const song = playlist.songs[startIndex];
-    if (song) {
-      store.setCurrentSong(song);
-      audio.loadAndPlay(song.url, 0);
-      const { volume, isMuted } = usePlayerStore.getState();
-      audio.setVolume(isMuted ? 0 : volume);
-      updateMediaSession(song);
-    }
-  }, [store]);
+    if (song) playSong(song);
+  }, [store, playSong]);
 
   const next = useCallback(() => {
     const { currentSong, position } = usePlayerStore.getState();
@@ -385,13 +397,36 @@ export function usePlayer() {
     }
     const nextSong = store.nextSong();
     if (nextSong) {
-      store.setCurrentSong(nextSong);
-      audio.loadAndPlay(nextSong.url, 0);
-      const { volume, isMuted } = usePlayerStore.getState();
-      audio.setVolume(isMuted ? 0 : volume);
-      updateMediaSession(nextSong);
+      playSong(nextSong);
+    } else {
+      const { smartQueueEnabled, radioSeeds, queue } = usePlayerStore.getState();
+      if (smartQueueEnabled && currentSong) {
+        if (radioSeeds.length > 0) {
+          const seed = radioSeeds[0];
+          const remaining = radioSeeds.slice(1);
+          usePlayerStore.getState().setRadioSeeds(remaining);
+          const newQueue = [...queue, seed];
+          usePlayerStore.getState().setQueue(newQueue, newQueue.length - 1);
+          playSong(seed);
+        } else {
+          const artistName = currentSong.artist?.split(',')[0]?.trim();
+          if (artistName) {
+            searchSongs(artistName, 10).then(results => {
+              const queueIds = new Set(usePlayerStore.getState().queue.map(s => s.id));
+              const fresh = results.filter(s => s.id !== currentSong.id && !queueIds.has(s.id)).slice(0, 6);
+              if (fresh.length > 0) {
+                const first = fresh[0];
+                usePlayerStore.getState().setRadioSeeds(fresh.slice(1));
+                const newQueue = [...usePlayerStore.getState().queue, first];
+                usePlayerStore.getState().setQueue(newQueue, newQueue.length - 1);
+                playSong(first);
+              }
+            }).catch(() => {});
+          }
+        }
+      }
     }
-  }, [store]);
+  }, [store, playSong]);
 
   const prev = useCallback(() => {
     const pos = audio.getPosition();
@@ -400,26 +435,14 @@ export function usePlayer() {
       store.setPosition(0);
     } else {
       const p = store.prevSong();
-      if (p) {
-        store.setCurrentSong(p);
-        audio.loadAndPlay(p.url, 0);
-        const { volume, isMuted } = usePlayerStore.getState();
-        audio.setVolume(isMuted ? 0 : volume);
-        updateMediaSession(p);
-      }
+      if (p) playSong(p);
     }
-  }, [store]);
+  }, [store, playSong]);
 
   const jumpToQueueSong = useCallback((index) => {
     const song = store.jumpToQueueIndex(index);
-    if (song) {
-      store.setCurrentSong(song);
-      audio.loadAndPlay(song.url, 0);
-      const { volume, isMuted } = usePlayerStore.getState();
-      audio.setVolume(isMuted ? 0 : volume);
-      updateMediaSession(song);
-    }
-  }, [store]);
+    if (song) playSong(song);
+  }, [store, playSong]);
 
   return {
     ...store,

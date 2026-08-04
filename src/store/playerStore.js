@@ -530,6 +530,26 @@ const usePlayerStore = create(
 
       // ── Lookups ───────────────────────────────────────────────────────────
       getPlaylistById: (id) => {
+        if (id === 'liked') {
+          return {
+            id: 'liked',
+            title: 'Liked Songs',
+            cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&auto=format&fit=crop&q=60',
+            songs: get().likedSongObjects || [],
+          };
+        }
+        if (id === 'history') {
+          const { recentSongs, allSongs, jiosaavnCache } = get();
+          const recentObjects = (recentSongs || []).map(songId =>
+            allSongs.find(s => s.id === songId) || jiosaavnCache[songId]
+          ).filter(Boolean);
+          return {
+            id: 'history',
+            title: 'Recently Played History',
+            cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop&q=60',
+            songs: recentObjects,
+          };
+        }
         const local = playlistData.playlists.find(p => p.id === id);
         if (local) return local;
         if (id === SHARED_PLAYLIST_ID) return get().sharedPlaylist;

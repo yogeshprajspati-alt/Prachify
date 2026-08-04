@@ -237,34 +237,52 @@ function DraggableHannahFab() {
         if (e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
       }}
       onTouchEnd={handleEnd}
+      title="Ask Hannah AI (Alt+H)"
       style={{
         position: 'fixed',
         left: pos.x,
         top: pos.y,
-        width: 54,
-        height: 54,
+        width: 58,
+        height: 58,
         borderRadius: '50%',
-        overflow: 'hidden',
-        background: '#282828',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+        background: 'linear-gradient(135deg, #ff4fa3 0%, #a855f7 50%, #3b82f6 100%)',
+        padding: 3,
+        boxShadow: '0 10px 32px rgba(255, 79, 163, 0.55), 0 0 24px rgba(168, 85, 247, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: isDragging.current ? 'grabbing' : 'grab',
-        zIndex: 900,
+        zIndex: 9900,
         touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
+        transition: isDragging.current ? 'none' : 'transform 0.2s ease, box-shadow 0.2s ease',
       }}
     >
-      <img
-        src="/hannah-avatar.png"
-        alt="Hannah"
-        draggable={false}
-        onError={e => e.currentTarget.style.display = 'none'}
-        style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', pointerEvents: 'none' }}
-      />
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        borderRadius: '50%',
+        overflow: 'hidden',
+        background: '#0e0b18',
+      }}>
+        <img
+          src="/hannah-avatar.png"
+          alt="Hannah AI"
+          draggable={false}
+          onError={e => e.currentTarget.style.display = 'none'}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', pointerEvents: 'none' }}
+        />
+        {/* Pulsating green online dot badge */}
+        <span style={{
+          position: 'absolute', bottom: 2, right: 2,
+          width: 10, height: 10, borderRadius: '50%',
+          background: '#10b981', border: '2px solid #0e0b18',
+          boxShadow: '0 0 8px #10b981',
+          pointerEvents: 'none',
+        }} />
+      </div>
     </div>
   );
 }

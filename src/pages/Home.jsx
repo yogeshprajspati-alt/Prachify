@@ -137,7 +137,7 @@ export default function Home() {
       icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13M9 9l12-2M5 21a3 3 0 100-6 3 3 0 000 6zM17 19a3 3 0 100-6 3 3 0 000 6z"/></svg>
     },
     { 
-      label: 'History', value: `${recentSongs.length} played`, action: () => {},
+      label: 'History', value: `${recentSongs.length} played`, action: () => navigate('/playlist/history'),
       bg: '#282828',
       icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     },

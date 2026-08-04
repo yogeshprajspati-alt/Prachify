@@ -1,5 +1,29 @@
 [
   {
+    "version": "1.1.6",
+    "date": "2026-08-04",
+    "updates": [
+      "✨ Added Portable Compact Floating Mode for Hannah Chat with 60fps drag support",
+      "🎵 Fixed stream URL resolution for History and Liked Songs playback",
+      "🌸 Enhanced Hannah Floating FAB with vibrant neon glow and status indicator"
+    ]
+  },
+  {
+    "version": "1.1.5",
+    "date": "2026-07-26",
+    "updates": [
+      "📱 Local storage and playlist issues fixed"
+    ]
+  },
+  {
+    "version": "1.1.4",
+    "date": "2026-07-16",
+    "updates": [
+      "📱 Prfile Switch For All Users",
+      "🎵 New Ui and Role Based Response for Hannah"
+    ]
+  },
+  {
     "version": "1.1.3",
     "date": "2026-06-06",
     "updates": [

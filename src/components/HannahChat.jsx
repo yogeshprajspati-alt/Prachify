@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import useChatStore from '../store/chatStore';
 import usePlayerStore from '../store/playerStore';
 import useProfileStore from '../store/profileStore';
@@ -8,7 +8,10 @@ import { usePlayer } from '../hooks/usePlayer';
 import { searchSongs } from '../services/jiosaavn';
 
 export default function HannahChat() {
-  const { messages, isTyping, addMessage, updateLastMessage, setIsTyping, isOpen, toggleChat, clearChat } = useChatStore();
+  const {
+    messages, isTyping, addMessage, updateLastMessage, setIsTyping,
+    isOpen, toggleChat, clearChat, isCompact, toggleCompact, compactPos, setCompactPos
+  } = useChatStore();
   const { currentSong, isPlaying, togglePlay, next, playSong } = usePlayer();
   const toggleLike = usePlayerStore(s => s.toggleLike);
   const setVolume = usePlayerStore(s => s.setVolume);
@@ -22,6 +25,88 @@ export default function HannahChat() {
   const chatEndRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const panelRef = useRef(null);
+
+  // Boundary clamping utility so compact box never cuts off screen or goes off-screen
+  const clampPos = useCallback((x, y) => {
+    const padding = 12;
+    const boxW = panelRef.current?.offsetWidth || Math.min(360, (window.innerWidth || 360) - 24);
+    const boxH = panelRef.current?.offsetHeight || Math.min(480, (window.innerHeight || 640) - 110);
+    const bottomReserved = 92; // keep clear of bottom player navbar
+    const maxX = Math.max(padding, (window.innerWidth || 360) - boxW - padding);
+    const maxY = Math.max(padding, (window.innerHeight || 640) - boxH - bottomReserved);
+
+    const safeX = (typeof x === 'number' && !Number.isNaN(x) && Number.isFinite(x)) ? x : maxX;
+    const safeY = (typeof y === 'number' && !Number.isNaN(y) && Number.isFinite(y)) ? y : Math.min(100, maxY);
+
+    return {
+      x: Math.min(Math.max(padding, safeX), maxX),
+      y: Math.min(Math.max(padding, safeY), maxY),
+    };
+  }, []);
+
+  // Compact mode position state with automatic viewport validation
+  const [pos, setPos] = useState(() => {
+    return clampPos(compactPos?.x, compactPos?.y);
+  });
+
+  const isDragging = useRef(false);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const elementStartPos = useRef({ x: 0, y: 0 });
+  const hasMoved = useRef(false);
+
+  // Immediately re-clamp position whenever compact mode opens or window resizes
+  useEffect(() => {
+    if (!isCompact) return;
+    setPos(prev => clampPos(prev.x, prev.y));
+
+    const handleResize = () => {
+      setPos(prev => clampPos(prev.x, prev.y));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isCompact, clampPos]);
+
+  // Pointer capture drag handlers
+  const handleHeaderPointerDown = (e) => {
+    if (!isCompact) return;
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) return;
+
+    isDragging.current = true;
+    hasMoved.current = false;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    elementStartPos.current = { ...pos };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleHeaderPointerMove = (e) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - dragStartPos.current.x;
+    const dy = e.clientY - dragStartPos.current.y;
+
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      hasMoved.current = true;
+    }
+
+    if (hasMoved.current) {
+      const newPos = clampPos(
+        elementStartPos.current.x + dx,
+        elementStartPos.current.y + dy
+      );
+      setPos(newPos);
+    }
+  };
+
+  const handleHeaderPointerUp = (e) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+    if (hasMoved.current) {
+      setCompactPos(pos);
+    }
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -173,12 +258,31 @@ export default function HannahChat() {
   };
 
   return (
-    <div className="hannah-drawer-overlay">
-      {/* Backdrop overlay */}
-      <div className="hannah-drawer-backdrop" onClick={toggleChat} />
+    <div className={`hannah-drawer-overlay ${isCompact ? 'is-compact' : ''}`}>
+      {/* Backdrop overlay (only in full drawer mode) */}
+      {!isCompact && <div className="hannah-drawer-backdrop" onClick={toggleChat} />}
 
-      {/* Right Sidebar Drawer Panel */}
-      <aside className="hannah-drawer-panel">
+      {/* Main Drawer or Floating Compact Panel */}
+      <aside
+        ref={panelRef}
+        className={`hannah-drawer-panel ${isCompact ? 'hannah-compact-panel' : ''}`}
+        style={isCompact ? {
+          position: 'fixed',
+          left: pos.x,
+          top: pos.y,
+          width: 'min(360px, calc(100vw - 24px))',
+          height: 'min(480px, calc(100vh - 110px))',
+          bottom: 'auto',
+          right: 'auto',
+          borderRadius: 20,
+          border: '1px solid rgba(255, 79, 163, 0.4)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 35px rgba(168, 85, 247, 0.3)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 9910,
+          touchAction: 'none',
+        } : {}}
+      >
         {/* Ambient Glow Orbs */}
         <div style={{
           position: 'absolute', top: -40, right: -40, width: 220, height: 220, borderRadius: '50%',
@@ -191,23 +295,41 @@ export default function HannahChat() {
           filter: 'blur(35px)', pointerEvents: 'none',
         }} />
 
-        {/* ── Modern Header ── */}
-        <div style={{
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(20, 16, 34, 0.8)',
-          backdropFilter: 'blur(16px)',
-          position: 'relative', zIndex: 2,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* ── Modern Header (Draggable in Compact Mode) ── */}
+        <div
+          onPointerDown={handleHeaderPointerDown}
+          onPointerMove={handleHeaderPointerMove}
+          onPointerUp={handleHeaderPointerUp}
+          onPointerCancel={handleHeaderPointerUp}
+          style={{
+            padding: isCompact ? '12px 14px' : '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(20, 16, 34, 0.85)',
+            backdropFilter: 'blur(16px)',
+            position: 'relative', zIndex: 2,
+            cursor: isCompact ? (isDragging.current ? 'grabbing' : 'grab') : 'default',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+          }}
+        >
+          {/* Drag Handle Bar when in Compact mode */}
+          {isCompact && (
+            <div style={{
+              position: 'absolute', top: 5, left: '50%', transform: 'translateX(-50%)',
+              width: 34, height: 4, borderRadius: 2, background: 'rgba(255, 255, 255, 0.3)',
+              pointerEvents: 'none',
+            }} />
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: isCompact ? 8 : 12 }}>
             <div style={{ position: 'relative' }}>
               <div style={{
-                width: 44, height: 44, borderRadius: '50%',
+                width: isCompact ? 36 : 44, height: isCompact ? 36 : 44, borderRadius: '50%',
                 background: 'linear-gradient(135deg, #ff4fa3 0%, #a855f7 50%, #3b82f6 100%)',
-                padding: 2.5, boxShadow: '0 0 16px rgba(255, 79, 163, 0.4)',
+                padding: 2, boxShadow: '0 0 16px rgba(255, 79, 163, 0.4)',
               }}>
                 <div style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: '#0e0b18' }}>
                   <img
@@ -220,39 +342,74 @@ export default function HannahChat() {
               </div>
               <span style={{
                 position: 'absolute', bottom: 1, right: 1,
-                width: 11, height: 11, borderRadius: '50%',
+                width: 9, height: 9, borderRadius: '50%',
                 background: '#10b981', border: '2px solid #0e0b18',
                 boxShadow: '0 0 8px #10b981',
               }} />
             </div>
 
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                Hannah <span style={{ fontSize: 11, background: 'linear-gradient(135deg, #ff4fa3, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 900 }}>AI</span>
-                {/* Keyboard hint badge */}
-                <span style={{
-                  fontSize: 10, background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  padding: '1px 6px', borderRadius: 6, color: '#cbd5e1', fontWeight: 600,
-                  marginLeft: 4,
-                }}>
-                  Alt+H
-                </span>
+              <div style={{ fontSize: isCompact ? 15 : 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                Hannah <span style={{ fontSize: 10, background: 'linear-gradient(135deg, #ff4fa3, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 900 }}>AI</span>
+                {!isCompact && (
+                  <span style={{
+                    fontSize: 10, background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    padding: '1px 6px', borderRadius: 6, color: '#cbd5e1', fontWeight: 600,
+                    marginLeft: 4,
+                  }}>
+                    Alt+H
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: 11, color: '#a78bfa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', animation: 'hannahPulse 2s infinite' }} />
-                Smart Music Copilot
+              <div style={{ fontSize: isCompact ? 10 : 11, color: '#a78bfa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', animation: 'hannahPulse 2s infinite' }} />
+                {isCompact ? 'Portable Copilot' : 'Smart Music Copilot'}
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Mode Switcher Button (Compact ↔ Full Drawer) */}
             <button
-              onClick={clearChat}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCompact();
+              }}
+              title={isCompact ? "Expand to full drawer" : "Switch to portable compact floating box"}
+              style={{
+                background: isCompact ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                border: isCompact ? '1px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255, 255, 255, 0.12)',
+                color: isCompact ? '#c084fc' : '#fff',
+                width: 30, height: 30, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.2s ease',
+                boxShadow: isCompact ? '0 0 12px rgba(168, 85, 247, 0.4)' : 'none',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = isCompact ? 'rgba(168, 85, 247, 0.35)' : 'rgba(255, 255, 255, 0.16)'}
+              onMouseLeave={e => e.currentTarget.style.background = isCompact ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.08)'}
+            >
+              {isCompact ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </svg>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <rect x="11" y="11" width="7" height="7" rx="1" fill="currentColor" opacity="0.9" />
+                </svg>
+              )}
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); clearChat(); }}
               style={{
                 background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: '#cbd5e1', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                padding: '6px 12px', borderRadius: 20, transition: 'all 0.2s',
+                color: '#cbd5e1', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                padding: '5px 10px', borderRadius: 20, transition: 'all 0.2s',
               }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'}
@@ -260,11 +417,11 @@ export default function HannahChat() {
               Clear
             </button>
             <button
-              onClick={toggleChat}
+              onClick={(e) => { e.stopPropagation(); toggleChat(); }}
               style={{
                 background: 'rgba(255, 255, 255, 0.08)', border: 'none',
-                color: '#fff', fontSize: 16, cursor: 'pointer',
-                width: 32, height: 32, borderRadius: '50%',
+                color: '#fff', fontSize: 15, cursor: 'pointer',
+                width: 30, height: 30, borderRadius: '50%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'background 0.2s',
               }}
@@ -328,7 +485,7 @@ export default function HannahChat() {
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '18px 20px',
+          padding: isCompact ? '12px 14px' : '18px 20px',
           display: 'flex',
           flexDirection: 'column',
           gap: 14,
@@ -399,6 +556,7 @@ export default function HannahChat() {
                       ? '0 4px 18px rgba(168, 85, 247, 0.35)'
                       : '0 4px 14px rgba(0, 0, 0, 0.3)',
                     whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
                     fontWeight: 500,
                   }}>
                     {cleanText}
@@ -496,7 +654,7 @@ export default function HannahChat() {
 
         {/* ── Input Controls & Chips ── */}
         <div style={{
-          padding: '14px 18px max(env(safe-area-inset-bottom), 16px)',
+          padding: isCompact ? '10px 12px max(env(safe-area-inset-bottom), 10px)' : '14px 18px max(env(safe-area-inset-bottom), 16px)',
           background: 'rgba(12, 10, 22, 0.95)',
           borderTop: '1px solid rgba(255, 255, 255, 0.08)',
           position: 'relative', zIndex: 2,
@@ -511,8 +669,8 @@ export default function HannahChat() {
                   style={{
                     background: 'rgba(255, 255, 255, 0.06)',
                     border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 20, padding: '7px 14px',
-                    color: '#e2e8f0', fontSize: 12, fontWeight: 600,
+                    borderRadius: 20, padding: '6px 12px',
+                    color: '#e2e8f0', fontSize: 11, fontWeight: 600,
                     whiteSpace: 'nowrap', cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     fontFamily: 'inherit',
@@ -552,7 +710,7 @@ export default function HannahChat() {
             display: 'flex', alignItems: 'center',
             background: 'rgba(255, 255, 255, 0.07)',
             border: isRecording ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 255, 255, 0.14)',
-            borderRadius: 30, padding: '4px 6px 4px 16px',
+            borderRadius: 30, padding: '3px 5px 3px 14px',
             boxShadow: isRecording ? '0 0 24px rgba(239, 68, 68, 0.25)' : '0 4px 20px rgba(0, 0, 0, 0.3)',
             transition: 'all 0.25s ease',
           }}>
@@ -564,8 +722,8 @@ export default function HannahChat() {
               disabled={isRecording || isTranscribing}
               style={{
                 flex: 1, background: 'none', border: 'none',
-                color: '#fff', fontSize: 14, outline: 'none',
-                fontFamily: 'inherit', padding: '8px 0',
+                color: '#fff', fontSize: 13, outline: 'none',
+                fontFamily: 'inherit', padding: '6px 0',
                 opacity: (isRecording || isTranscribing) ? 0.6 : 1,
               }}
             />
@@ -575,7 +733,7 @@ export default function HannahChat() {
               <button
                 onClick={isRecording ? handleRecordStop : handleRecordStart}
                 style={{
-                  width: 38, height: 38, borderRadius: '50%', border: 'none',
+                  width: 34, height: 34, borderRadius: '50%', border: 'none',
                   background: isRecording ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'transparent',
                   color: isRecording ? '#fff' : '#94a3b8',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
@@ -585,13 +743,13 @@ export default function HannahChat() {
                 title={isRecording ? "Tap to stop" : "Voice message"}
               >
                 {isTranscribing ? (
-                  <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'hannahSpin 0.8s linear infinite' }} />
+                  <div style={{ width: 14, height: 14, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'hannahSpin 0.8s linear infinite' }} />
                 ) : isRecording ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff" stroke="#fff" strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" stroke="#fff" strokeWidth="2">
                     <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
                   </svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                     <line x1="12" y1="19" x2="12" y2="23" />
@@ -605,7 +763,7 @@ export default function HannahChat() {
               <button
                 onClick={() => handleSend(input)}
                 style={{
-                  width: 38, height: 38, borderRadius: '50%',
+                  width: 34, height: 34, borderRadius: '50%',
                   background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
                   border: 'none', display: 'flex', alignItems: 'center',
                   justifyContent: 'center', cursor: 'pointer',
@@ -615,7 +773,7 @@ export default function HannahChat() {
                 onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
                 onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'translateX(1px)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'translateX(1px)' }}>
                   <line x1="22" y1="2" x2="11" y2="13" />
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
@@ -627,11 +785,15 @@ export default function HannahChat() {
       </aside>
 
       <style>{`
-        /* Right Sidebar Drawer Styling */
+        /* Right Sidebar Drawer & Compact Floating Box Styling */
         .hannah-drawer-overlay {
           position: fixed;
           inset: 0;
           z-index: 9900;
+          pointer-events: none;
+        }
+
+        .hannah-drawer-overlay.is-compact {
           pointer-events: none;
         }
 
@@ -663,12 +825,24 @@ export default function HannahChat() {
           z-index: 9910;
         }
 
+        .hannah-compact-panel {
+          pointer-events: auto !important;
+          right: auto !important;
+          bottom: auto !important;
+          animation: hannahCompactPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
         @media (max-width: 768px) {
-          .hannah-drawer-panel {
+          .hannah-drawer-panel:not(.hannah-compact-panel) {
             width: 100vw;
             bottom: 0;
             border-left: none;
           }
+        }
+
+        @keyframes hannahCompactPop {
+          from { transform: scale(0.92); opacity: 0; }
+          to   { transform: scale(1); opacity: 1; }
         }
 
         @keyframes hannahOverlayFade {
