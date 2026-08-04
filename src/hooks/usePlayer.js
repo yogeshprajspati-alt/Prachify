@@ -211,9 +211,9 @@ export function usePlayerEngine() {
         // when an HTML5 audio stream is paused or buffer drops.
         const { position, duration } = usePlayerStore.getState();
         if (duration > 0 && position < duration - 3) {
+          // Don't set isPlaying:false — audio engine is still running fine.
+          // Just log and ignore this false event so the UI stays in "playing" state.
           console.warn('[Player Guard] Ignored false onEnd event mid-stream. Pos:', position, 'Dur:', duration);
-          store.setIsPlaying(false);
-          stopPositionTick();
           return;
         }
 
@@ -373,9 +373,15 @@ export function usePlayer() {
     updateMediaSession(song);
 
     // Timeout to break out of infinite loading if CDN is blocked.
+    // Use song.id captured in closure to avoid acting on a different song that loaded in the meantime.
+    const loadedSongId = song.id;
     setTimeout(() => {
       const state = usePlayerStore.getState();
-      if (state.isLoading && state.currentSong?.id === song.id && !audio.isPlaying() && audio.getDuration() === 0) {
+      // Only abort if: still loading THIS song, not playing, AND still has no valid duration
+      // (getDuration() > 0 means the audio loaded, even if onLoad callback was slightly delayed)
+      const stillLoadingThisSong = state.isLoading && state.currentSong?.id === loadedSongId;
+      const audioStuck = !audio.isPlaying() && audio.getDuration() === 0;
+      if (stillLoadingThisSong && audioStuck) {
         audio.unload();
         store.setIsLoading(false);
         store.setHasError(true);
