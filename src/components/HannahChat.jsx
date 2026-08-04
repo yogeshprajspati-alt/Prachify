@@ -805,6 +805,9 @@ export default function HannahChat() {
           WebkitBackdropFilter: blur(6px);
           pointer-events: auto;
           animation: hannahOverlayFade 0.25s ease;
+          /* iOS Safari: prevent background page scroll bleeding through overlay */
+          touch-action: none;
+          overscroll-behavior: contain;
         }
 
         .hannah-drawer-panel {
@@ -823,6 +826,9 @@ export default function HannahChat() {
           overflow: hidden;
           animation: hannahDrawerSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1);
           z-index: 9910;
+          /* iOS Safari: internal scroll only, no bleed to page */
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
         }
 
         .hannah-compact-panel {

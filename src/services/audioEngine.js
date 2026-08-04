@@ -7,6 +7,7 @@ import { Howl } from 'howler';
 
 let howl = null;
 let currentUrl = null;
+let targetVolume = 1.0; // Tracks actual desired volume for crossfade fade-in target
 
 const callbacks = {
   onPlay: null,
@@ -19,6 +20,25 @@ const callbacks = {
 
 export function setCallbacks(cbs) {
   Object.assign(callbacks, cbs);
+}
+
+// ── iOS Safari Background/Foreground AudioContext Resume ────────────────────
+// iOS Safari suspends the AudioContext when the PWA is backgrounded.
+// Without this, audio through the Web Audio EQ chain stays permanently silent
+// when the user returns to the app from background/lock screen.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      // Resume AudioContext when app comes to foreground
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      // Also nudge Howler's global context if it has one
+      if (typeof window !== 'undefined' && window.Howler?.ctx?.state === 'suspended') {
+        window.Howler.ctx.resume().catch(() => {});
+      }
+    }
+  });
 }
 
 export function loadAndPlay(url, startPosition = 0) {
@@ -34,10 +54,17 @@ export function loadAndPlay(url, startPosition = 0) {
     return;
   }
 
-  // Naya song — pehla unload karo
+  // Naya song — crossfade out current song, then load new one
   if (howl) {
-    howl.unload();
-    howl = null;
+    const oldHowl = howl;
+    howl = null; // Detach immediately so callbacks don't fire on old instance
+    if (oldHowl.playing()) {
+      // Fade out over 400ms, then unload
+      oldHowl.fade(oldHowl.volume(), 0, 400);
+      setTimeout(() => { try { oldHowl.unload(); } catch (e) {} }, 420);
+    } else {
+      oldHowl.unload();
+    }
   }
 
   currentUrl = url;
@@ -46,11 +73,13 @@ export function loadAndPlay(url, startPosition = 0) {
     src: [url],
     html5: true,
     preload: true,
-    volume: 1.0,
+    volume: 0, // Start silent — fade in on play
     onplay: () => {
       callbacks.onPlay?.();
       const node = howl?._sounds?.[0]?._node;
       if (node) initEqFilters(node);
+      // Fade in to actual target volume over 400ms
+      howl?.fade(0, targetVolume, 400);
     },
     onpause: () => callbacks.onPause?.(),
     onend: () => callbacks.onEnd?.(),
@@ -108,7 +137,15 @@ export function seek(seconds) {
 }
 
 export function setVolume(vol) {
-  if (howl) howl.volume(vol);
+  targetVolume = vol; // Always track desired volume
+  // Only set directly if not currently fading in (i.e., howl volume > 0.05)
+  if (howl) {
+    const current = howl.volume();
+    if (current > 0.05) {
+      howl.volume(vol); // Already faded in — set directly
+    }
+    // If still fading in, fade() will reach targetVolume on its own
+  }
   if (typeof window !== 'undefined' && window.Howler) {
     window.Howler.volume(vol);
   }

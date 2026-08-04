@@ -17,7 +17,7 @@ export function SongScroll({ songs, currentSong, isPlaying, onPlay }) {
 export function SkeletonRow() {
   return (
     <div style={{ display: 'flex', gap: 12, padding: '0 16px 8px', overflowX: 'hidden' }}>
-      {[1, 2, 3].map(i => (
+      {[1, 2, 3, 4, 5].map(i => (
         <div key={i} style={{ flexShrink: 0, width: 136 }}>
           <div className="shimmer" style={{ width: 136, height: 136, borderRadius: 10, background: 'rgba(255,255,255,0.06)', marginBottom: 8 }} />
           <div className="shimmer" style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.06)', marginBottom: 6, width: '80%' }} />

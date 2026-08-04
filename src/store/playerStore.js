@@ -597,12 +597,9 @@ const usePlayerStore = create(
         isMuted: s.isMuted,
         playbackRate: s.playbackRate,
         eqPreset: s.eqPreset,
-        jiosaavnCache: (() => {
-          const entries = Object.entries(s.jiosaavnCache || {});
-          return entries.length > 100
-            ? Object.fromEntries(entries.slice(-100))
-            : s.jiosaavnCache;
-        })(),
+        // jiosaavnCache intentionally excluded — memory-only session cache.
+        // Persisting it to localStorage bloats the key by up to 100KB and
+        // causes main-thread jank on mobile devices during every profile switch.
       }),
       merge: (persistedState, currentState) => {
         const p = (persistedState && typeof persistedState === 'object') ? persistedState : {};
@@ -616,7 +613,7 @@ const usePlayerStore = create(
           likedSongs: Array.isArray(p.likedSongs) ? p.likedSongs : [],
           likedSongObjects: Array.isArray(p.likedSongObjects) ? p.likedSongObjects : [],
           skippedSongs: (p.skippedSongs && typeof p.skippedSongs === 'object') ? p.skippedSongs : {},
-          jiosaavnCache: (p.jiosaavnCache && typeof p.jiosaavnCache === 'object') ? p.jiosaavnCache : {},
+          jiosaavnCache: {}, // Always start fresh — no longer persisted to localStorage
           queue: Array.isArray(p.queue) ? p.queue : [],
           sharedPlaylist: (p.sharedPlaylist && typeof p.sharedPlaylist === 'object' && Array.isArray(p.sharedPlaylist.songs))
             ? p.sharedPlaylist
@@ -645,7 +642,8 @@ export function loadProfileState(profileId) {
         likedSongObjects: Array.isArray(p.likedSongObjects) ? p.likedSongObjects : [],
         recentSongs: Array.isArray(p.recentSongs) ? p.recentSongs : [],
         skippedSongs: (p.skippedSongs && typeof p.skippedSongs === 'object') ? p.skippedSongs : {},
-        jiosaavnCache: (p.jiosaavnCache && typeof p.jiosaavnCache === 'object') ? p.jiosaavnCache : {},
+        // jiosaavnCache is memory-only — always reset on profile switch
+        jiosaavnCache: {},
       });
       return;
     } catch (e) {}

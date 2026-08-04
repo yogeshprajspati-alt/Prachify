@@ -122,7 +122,8 @@ const Library      = React.lazy(() => import('./pages/Library'));
 const PlaylistPage = React.lazy(() => import('./pages/PlaylistPage'));
 const Explore      = React.lazy(() => import('./pages/Explore'));
 const ArtistPage   = React.lazy(() => import('./pages/ArtistPage'));
-import HannahChat from './components/HannahChat';
+// HannahChat is 39KB — lazy-load it so it doesn't bloat the initial bundle
+const HannahChat   = React.lazy(() => import('./components/HannahChat'));
 
 function GlobalShortcuts() {
   const { togglePlay, next, prev } = usePlayer();

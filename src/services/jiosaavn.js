@@ -85,32 +85,44 @@ export function normalizeSong(raw) {
   };
 }
 
+// In-flight request deduplication map: path → Promise
+// Prevents duplicate parallel network calls for the same resource —
+// critical on mobile where each request costs battery + data.
+const _inFlight = new Map();
+
 // Core fetch with timeout + retry logic
 async function apiFetch(path, retries = 1) {
+  // Return in-flight promise if same path is already being fetched
+  if (_inFlight.has(path)) return _inFlight.get(path);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout (render cold start)
 
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      signal: controller.signal,
-      headers: { 'Accept': 'application/json' },
-    });
-    clearTimeout(timeout);
+  const promise = (async () => {
+    try {
+      const res = await fetch(`${BASE}${path}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timeout);
 
-    if (!res.ok) {
-      // Try /api prefix if non-api path fails, and vice versa
-      throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      clearTimeout(timeout);
+      if (retries > 0 && err.name !== 'AbortError') {
+        // Retry once after short delay (handles Render cold start)
+        await new Promise(r => setTimeout(r, 1500));
+        return apiFetch(path, retries - 1);
+      }
+      throw err;
     }
-    return await res.json();
-  } catch (err) {
-    clearTimeout(timeout);
-    if (retries > 0 && err.name !== 'AbortError') {
-      // Retry once after short delay (handles Render cold start)
-      await new Promise(r => setTimeout(r, 1500));
-      return apiFetch(path, retries - 1);
-    }
-    throw err;
-  }
+  })().finally(() => _inFlight.delete(path)); // Clean up once resolved or rejected
+
+  _inFlight.set(path, promise);
+  return promise;
 }
 
 // Try both /api/path and /path prefixes, return whichever works
