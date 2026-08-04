@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import playlistData from '../data/playlist.json';
+import { setEqPreset as setAudioEngineEq } from '../services/audioEngine';
 import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists, syncSharedPlaylist, fetchSharedPlaylist, SHARED_PLAYLIST_ID } from '../services/db';
 import { generatePlaylistCover } from '../utils/generatePlaylistCover';
 import { getActiveProfileId, getProfileById } from './profileStore';
@@ -101,7 +102,13 @@ const usePlayerStore = create(
       volume: 1.0,
       isMuted: false,
       playbackRate: 1.0,
+      eqPreset: 'Flat',
       abLoop: { active: false, a: null, b: null },
+
+      setEqPreset: (preset) => {
+        set({ eqPreset: preset });
+        setAudioEngineEq(preset);
+      },
 
       // ── Persistence ───────────────────────────────────────────────────────
       recentSongs: [],
@@ -589,6 +596,7 @@ const usePlayerStore = create(
         volume: s.volume,
         isMuted: s.isMuted,
         playbackRate: s.playbackRate,
+        eqPreset: s.eqPreset,
         jiosaavnCache: (() => {
           const entries = Object.entries(s.jiosaavnCache || {});
           return entries.length > 100
@@ -601,6 +609,7 @@ const usePlayerStore = create(
         return {
           ...currentState,
           ...p,
+          eqPreset: p.eqPreset || 'Flat',
           playlists: Array.isArray(p.playlists) ? p.playlists : (currentState.playlists || []),
           customPlaylists: Array.isArray(p.customPlaylists) ? p.customPlaylists : [],
           recentSongs: Array.isArray(p.recentSongs) ? p.recentSongs : [],

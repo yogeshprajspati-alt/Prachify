@@ -4,6 +4,7 @@ import usePlayerStore from '../store/playerStore';
 import { searchSongs, getLyrics } from '../services/jiosaavn';
 import { onUnlike, fetchFullscreenAISuggestions } from '../services/hannahsChoice.js';
 import { haptic, HAPTIC } from '../utils/haptic.js';
+import { EQ_PRESETS } from '../services/audioEngine.js';
 
 function LyricsView({ lines, position, duration, scrollRef }) {
   const currentIdx = duration > 0
@@ -84,6 +85,9 @@ export default function FullscreenPlayer({
   const abLoop = usePlayerStore(s => s.abLoop);
   const setAbPoint = usePlayerStore(s => s.setAbPoint);
   const resetAbLoop = usePlayerStore(s => s.resetAbLoop);
+  const eqPreset = usePlayerStore(s => s.eqPreset);
+  const setEqPreset = usePlayerStore(s => s.setEqPreset);
+  const [showEqModal, setShowEqModal] = useState(false);
   const setAddToPlaylistSong = usePlayerStore(s => s.setAddToPlaylistSong);
   const removeFromQueue = usePlayerStore(s => s.removeFromQueue);
   const addToQueue = usePlayerStore(s => s.addToQueue);
@@ -385,8 +389,31 @@ export default function FullscreenPlayer({
             ))}
           </div>
 
-          {/* Spacer (balance) */}
-          <div style={{ width: 38 }} />
+          {/* EQ Equalizer button */}
+          <button
+            onClick={() => { haptic(HAPTIC.TAP); setShowEqModal(true); }}
+            style={{ ...ctrl, position: 'relative' }}
+            title="Audio Equalizer"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={eqPreset !== 'Flat' ? '#1DB954' : 'rgba(255,255,255,0.8)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="21" x2="4" y2="14"/>
+              <line x1="4" y1="10" x2="4" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12" y2="3"/>
+              <line x1="20" y1="21" x2="20" y2="16"/>
+              <line x1="20" y1="12" x2="20" y2="3"/>
+              <line x1="1" y1="14" x2="7" y2="14"/>
+              <line x1="9" y1="8" x2="15" y2="8"/>
+              <line x1="17" y1="16" x2="23" y2="16"/>
+            </svg>
+            {eqPreset !== 'Flat' && (
+              <span style={{
+                position: 'absolute', top: 2, right: 2,
+                width: 6, height: 6, borderRadius: '50%',
+                background: '#1DB954', boxShadow: '0 0 8px #1DB954',
+              }} />
+            )}
+          </button>
         </div>
 
         {tab === 'player' ? (
@@ -841,7 +868,123 @@ export default function FullscreenPlayer({
         ) : null}
       </div>
 
+      {/* ── Equalizer Modal ────────────────────────────────────────────── */}
+      {showEqModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+            animation: 'fadeIn 0.25s ease',
+          }}
+          onClick={() => setShowEqModal(false)}
+        >
+          <div
+            style={{
+              width: '100%', maxWidth: 380,
+              background: 'rgba(24, 20, 36, 0.95)',
+              border: '1.5px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 24, padding: 24,
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(29, 185, 84, 0.15)',
+              animation: 'popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, #1DB954, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="21" x2="4" y2="14"/>
+                    <line x1="4" y1="10" x2="4" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12" y2="3"/>
+                    <line x1="20" y1="21" x2="20" y2="16"/>
+                    <line x1="20" y1="12" x2="20" y2="3"/>
+                    <line x1="1" y1="14" x2="7" y2="14"/>
+                    <line x1="9" y1="8" x2="15" y2="8"/>
+                    <line x1="17" y1="16" x2="23" y2="16"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Audio Equalizer</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Web Audio 5-Band DSP</div>
+                </div>
+              </div>
+
+              <button onClick={() => setShowEqModal(false)} style={smallCloseBtn}>
+                ✕
+              </button>
+            </div>
+
+            {/* 5-Band Animated Frequency Visualizer Bars */}
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.4)', borderRadius: 16, padding: '16px 12px',
+              marginBottom: 20, border: '1px solid rgba(255,255,255,0.06)',
+              display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: 110,
+            }}>
+              {['60Hz', '250Hz', '1kHz', '4kHz', '12kHz'].map((label, idx) => {
+                const gains = EQ_PRESETS[eqPreset]?.gains || [0, 0, 0, 0, 0];
+                const gain = gains[idx] || 0;
+                const heightPct = Math.min(Math.max(((gain + 10) / 20) * 100, 15), 100);
+                return (
+                  <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: gain > 0 ? '#1DB954' : 'rgba(255,255,255,0.4)' }}>
+                      {gain > 0 ? `+${gain}dB` : `${gain}dB`}
+                    </div>
+                    <div style={{ width: 10, height: 60, background: 'rgba(255,255,255,0.08)', borderRadius: 5, overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
+                      <div style={{
+                        width: '100%', height: `${heightPct}%`,
+                        background: gain > 0 ? 'linear-gradient(to top, #1DB954, #34d399)' : gain < 0 ? '#f43f5e' : 'rgba(255,255,255,0.3)',
+                        borderRadius: 5, transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{label}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Preset List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
+              {Object.entries(EQ_PRESETS).map(([key, preset]) => {
+                const isSelected = eqPreset === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      haptic(HAPTIC.TAP);
+                      setEqPreset(key);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                      borderRadius: 14, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                      background: isSelected ? 'rgba(29, 185, 84, 0.18)' : 'rgba(255,255,255,0.04)',
+                      outline: isSelected ? '1.5px solid #1DB954' : '1px solid rgba(255,255,255,0.06)',
+                      transition: 'all 0.2s ease', textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>{preset.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#1DB954' : '#fff' }}>{preset.name}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{preset.desc}</div>
+                    </div>
+                    {isSelected && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1DB954" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes bgFadeIn { from { opacity: 0; transform: translate(-14%,-14%) scale(1.05); } to { opacity: 1; transform: translate(-14%,-14%) scale(1); } }
         @keyframes artPop { from { opacity: 0; transform: scale(0.82); } to { opacity: 1; } }
@@ -927,6 +1070,13 @@ const ctrl = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   padding: 8, borderRadius: '50%', position: 'relative',
   WebkitTapHighlightColor: 'transparent',
+};
+
+const smallCloseBtn = {
+  background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer',
+  width: 28, height: 28, borderRadius: '50%', color: 'rgba(255,255,255,0.6)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  fontSize: 14, fontWeight: 'bold', WebkitTapHighlightColor: 'transparent',
 };
 
 /* Memoized blurred background — only re-renders on song change, not position ticks */

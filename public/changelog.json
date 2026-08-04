@@ -1,5 +1,12 @@
 [
   {
+    "version": "1.1.7",
+    "date": "2026-08-04",
+    "updates": [
+      "🎛️ Added 5-Band Web Audio Equalizer with 1-tap sound presets (Bass Boost, Vocal Enhancer, Party, Acoustic, Treble Boost)"
+    ]
+  },
+  {
     "version": "1.1.6",
     "date": "2026-08-04",
     "updates": [
