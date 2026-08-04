@@ -7,6 +7,15 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 // Precache app shell injected by Vite
 precacheAndRoute(self.__WB_MANIFEST);
 
+// Force new service worker activation immediately on deploy
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // Cache Google Fonts (Stylesheets)
 registerRoute(
   /^https:\/\/fonts\.googleapis\.com\/.*/i,

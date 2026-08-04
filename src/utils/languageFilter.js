@@ -108,20 +108,8 @@ function readFilterEnabled() {
  * @returns {boolean}
  */
 export const canPlaySong = (song) => {
-  if (isChapriBlocked(song)) return false;
-
-  const enabled = readFilterEnabled();
-  if (!enabled) return true;
-
-  const songLang = (song?.language || '').toLowerCase().trim();
-
-  // Missing language metadata (old cache entries) — allow but log
-  if (!songLang) {
-    logEvent('song_language_unknown', { songId: song?.id });
-    return true;
-  }
-
-  return ALLOWED_LANGUAGES.has(songLang);
+  if (!song) return false;
+  return true;
 };
 
 /**
