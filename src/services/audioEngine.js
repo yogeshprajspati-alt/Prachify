@@ -38,6 +38,7 @@ export function loadAndPlay(url, startPosition = 0) {
   if (howl) {
     howl.unload();
     howl = null;
+    resetEqEngine();
   }
 
   currentUrl = url;
@@ -75,6 +76,7 @@ export function loadOnly(url, startPosition = 0) {
   if (howl) {
     howl.unload();
     howl = null;
+    resetEqEngine();
   }
   currentUrl = url;
   howl = new Howl({
@@ -82,7 +84,11 @@ export function loadOnly(url, startPosition = 0) {
     html5: true,
     preload: true,
     volume: 1.0,
-    onplay: () => callbacks.onPlay?.(),
+    onplay: () => {
+      callbacks.onPlay?.();
+      const node = howl?._sounds?.[0]?._node;
+      if (node) initEqFilters(node);
+    },
     onpause: () => callbacks.onPause?.(),
     onend: () => callbacks.onEnd?.(),
     onload: () => {
@@ -135,6 +141,7 @@ export function unload() {
     howl.unload();
     howl = null;
     currentUrl = null;
+    resetEqEngine();
   }
 }
 
@@ -150,11 +157,22 @@ export const EQ_PRESETS = {
 
 let audioCtx = null;
 let sourceNode = null;
+let currentAudioNode = null;
 let eqFilters = [];
 let currentEqPreset = 'Flat';
 
+export function resetEqEngine() {
+  if (sourceNode) {
+    try { sourceNode.disconnect(); } catch (e) {}
+    sourceNode = null;
+  }
+  currentAudioNode = null;
+}
+
 function initEqFilters(audioNode) {
   if (!audioNode || typeof window === 'undefined') return;
+  if (currentAudioNode === audioNode && sourceNode) return;
+
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
@@ -166,32 +184,32 @@ function initEqFilters(audioNode) {
       audioCtx.resume().catch(() => {});
     }
 
-    if (!sourceNode && audioNode) {
-      // Create HTML5 media element source node
-      audioNode.crossOrigin = 'anonymous';
-      sourceNode = audioCtx.createMediaElementSource(audioNode);
+    resetEqEngine();
+    currentAudioNode = audioNode;
 
-      const FREQS = [60, 250, 1000, 4000, 12000];
-      const TYPES = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
+    // Create HTML5 media element source node with try-catch fallback
+    sourceNode = audioCtx.createMediaElementSource(audioNode);
 
-      eqFilters = FREQS.map((freq, idx) => {
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = TYPES[idx];
-        filter.frequency.value = freq;
-        filter.gain.value = EQ_PRESETS[currentEqPreset]?.gains[idx] || 0;
-        return filter;
-      });
+    const FREQS = [60, 250, 1000, 4000, 12000];
+    const TYPES = ['lowshelf', 'peaking', 'peaking', 'peaking', 'highshelf'];
 
-      // Connect source -> filter0 -> filter1 -> filter2 -> filter3 -> filter4 -> destination
-      sourceNode.connect(eqFilters[0]);
-      for (let i = 0; i < eqFilters.length - 1; i++) {
-        eqFilters[i].connect(eqFilters[i + 1]);
-      }
-      eqFilters[eqFilters.length - 1].connect(audioCtx.destination);
+    eqFilters = FREQS.map((freq, idx) => {
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = TYPES[idx];
+      filter.frequency.value = freq;
+      filter.gain.value = EQ_PRESETS[currentEqPreset]?.gains[idx] || 0;
+      return filter;
+    });
+
+    // Connect source -> filter0 -> filter1 -> filter2 -> filter3 -> filter4 -> destination
+    sourceNode.connect(eqFilters[0]);
+    for (let i = 0; i < eqFilters.length - 1; i++) {
+      eqFilters[i].connect(eqFilters[i + 1]);
     }
+    eqFilters[eqFilters.length - 1].connect(audioCtx.destination);
   } catch (err) {
-    // If MediaElementSource already connected or unsupported, log quietly
-    console.debug('[AudioEngine] EQ init notice:', err?.message || err);
+    // If MediaElementSource fails (e.g. CORS restrictions), HTML5 Audio will play natively
+    console.debug('[AudioEngine] Web Audio EQ bypass fallback:', err?.message || err);
   }
 }
 
@@ -203,7 +221,9 @@ export function setEqPreset(presetName) {
   if (eqFilters.length === 5) {
     gains.forEach((gain, i) => {
       if (eqFilters[i]) {
-        eqFilters[i].gain.setValueAtTime(gain, audioCtx ? audioCtx.currentTime : 0);
+        try {
+          eqFilters[i].gain.setValueAtTime(gain, audioCtx ? audioCtx.currentTime : 0);
+        } catch (e) {}
       }
     });
   }
@@ -215,15 +235,8 @@ export function getCurrentEqPreset() {
 
 export function setPlaybackRate(rate) {
   if (!howl) return;
-  // Howler HTML5 mode mein _sounds[0]._node = actual <audio> element
   const node = howl?._sounds?.[0]?._node;
   if (node) {
     node.playbackRate = rate;
-    initEqFilters(node);
   }
-}
-
-export function getPlaybackRate() {
-  const node = howl?._sounds?.[0]?._node;
-  return node?.playbackRate ?? 1.0;
 }
