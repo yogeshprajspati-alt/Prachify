@@ -128,6 +128,16 @@ export default function Library() {
         </button>
       ))}
 
+      {/* Dynamic Auto-Updating Build Version Footer */}
+      <div style={{ textAlign: 'center', padding: '24px 0 36px', opacity: 0.45, fontSize: 11, color: '#888' }}>
+        <button
+          onClick={openChangelog}
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}
+        >
+          Geet v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.1.8'} · Build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'Latest'}
+        </button>
+      </div>
+
       {changelogOpen && <ChangelogModal changelog={changelog} onClose={closeChangelog} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>

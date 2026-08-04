@@ -1,8 +1,25 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import fs from 'fs';
+import path from 'path';
+
+// Extract current top version from public/changelog.json for auto-versioning
+let appVersion = '1.1.8';
+try {
+  const changelog = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'public/changelog.json'), 'utf-8'));
+  if (changelog && changelog[0]?.version) {
+    appVersion = changelog[0].version;
+  }
+} catch (e) {}
+
+const buildTime = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_TIME__: JSON.stringify(buildTime),
+  },
   // TASK-06: Strip all console.log/warn/error and debugger in production builds
   // Vite 8 uses oxc (not esbuild) by default — use oxc.drop
   oxc: {
