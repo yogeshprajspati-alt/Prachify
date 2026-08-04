@@ -8,6 +8,7 @@ import { createCache, normalizeKey, limits } from '../utils/lruCache.js';
 import { shouldBypassFilter, filterSongsByLanguage } from '../utils/languageFilter.js';
 import { optimizeWithCancel } from '../services/aiSearch.js';
 import { getOnlineStatus } from '../utils/offlineManager.js';
+import { cleanSearchQuery, rankSearchResults } from '../utils/searchRanker.js';
 
 const SONG_CATEGORIES = [
   { label: 'Bollywood', gradient: 'linear-gradient(135deg, #8A2387, #E94057)', query: 'latest bollywood hits premium' },
@@ -160,9 +161,10 @@ export default function Search() {
     // Results clear nahi karo — purane results tab tak dikhe jab tak naye na aayein
 
     try {
+      const targetQuery = cleanSearchQuery(q) || q;
       const data = searchType === 'artists' 
-        ? await searchArtists(q, 25, 1) 
-        : await searchSongs(q, 25, 1);
+        ? await searchArtists(targetQuery, 25, 1) 
+        : await searchSongs(targetQuery, 25, 1);
         
       if (token.aborted) return;
       // § final.md §1 — chapri blocklist always applies; language check only
@@ -170,8 +172,13 @@ export default function Search() {
       const filtered = searchType === 'songs'
         ? filterSongsByLanguage(data, { languageCheck: !bypass })
         : data;
-      cache.set(cacheKey, filtered); // LRU cache
-      setResults(filtered);
+
+      const ranked = searchType === 'songs'
+        ? rankSearchResults(filtered, q)
+        : filtered;
+
+      cache.set(cacheKey, ranked); // LRU cache
+      setResults(ranked);
       if (data.length < 25) setHasMore(false);
       setStatus('done');
     } catch (err) {
@@ -386,21 +393,62 @@ export default function Search() {
       {/* Results */}
       {status === 'done' && results.length > 0 && (
         <div style={{ padding: '0 16px' }}>
-          <div style={{ fontSize: 12, color: '#727272', fontWeight: 600, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#727272', fontWeight: 600, marginBottom: 16 }}>
             {results.length} results for "{query}"
           </div>
-          {searchType === 'songs' ? (
-            results.map((song) => (
-              <div key={song.id} style={{ margin: '0 -8px' }}>
-                <SongRow
-                  song={song}
-                  isActive={currentSong?.id === song.id}
-                  isPlaying={isPlaying}
-                  onClick={() => handlePlay(song)}
-                  onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
-                />
+
+          {/* Spotify-style Top Result Hero Card — ONLY render if top result has positive relevance score */}
+          {searchType === 'songs' && results.length > 0 && (results[0]._relevanceScore === undefined || results[0]._relevanceScore > 0) && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 10 }}>Top result</div>
+              <div 
+                onClick={() => handlePlay(results[0])}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)',
+                  borderRadius: 12,
+                  padding: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  transition: 'background 0.2s',
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                onMouseOut={e => e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)'}
+              >
+                <img src={results[0].cover} alt="" style={{ width: 68, height: 68, borderRadius: 8, objectFit: 'cover', flexShrink: 0, boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }} onError={e => e.target.style.background = '#333'} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{results[0].title}</div>
+                  <div style={{ fontSize: 12, color: '#b3b3b3', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ background: '#1DB954', color: '#000', padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800, textTransform: 'uppercase' }}>Song</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{results[0].artist}</span>
+                  </div>
+                </div>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px rgba(29,185,84,0.4)' }}>
+                  {currentSong?.id === results[0].id && isPlaying
+                    ? <svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                    : <svg width="20" height="20" viewBox="0 0 24 24" fill="#000"><polygon points="5,3 19,12 5,21" /></svg>}
+                </div>
               </div>
-            ))
+            </div>
+          )}
+
+          {searchType === 'songs' ? (
+            <div>
+              {results.length > 1 && <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Songs</div>}
+              {results.map((song) => (
+                <div key={song.id} style={{ margin: '0 -8px' }}>
+                  <SongRow
+                    song={song}
+                    isActive={currentSong?.id === song.id}
+                    isPlaying={isPlaying}
+                    onClick={() => handlePlay(song)}
+                    onAddToPlaylist={(s) => setAddToPlaylistSong(s)}
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             results.map((artist) => (
               <button

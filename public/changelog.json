@@ -1,5 +1,14 @@
 [
   {
+    "version": "1.1.8",
+    "date": "2026-08-04",
+    "updates": [
+      "🔍 Smart Search & Natural Query Engine: Natural Language query parsing ('song by artist' e.g. 'naina by diljeet'), Hinglish typo auto-correction & multi-term relevance ranking",
+      "🏆 Spotify-Style 'Top Result' Hero Card in Search for instant 1-tap hit track playback",
+      "🎨 Redesigned Home Header with profile-tailored gradient text, 1-line dynamic greetings & glowing avatar profile switcher"
+    ]
+  },
+  {
     "version": "1.1.7",
     "date": "2026-08-04",
     "updates": [
