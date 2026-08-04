@@ -72,7 +72,7 @@ export function loadAndPlay(url, startPosition = 0) {
     src: [url],
     html5: true,
     preload: true,
-    volume: targetVolume, // Mobile safety: direct volume setting (never start at 0)
+    volume: targetVolume,
     onplay: () => {
       callbacks.onPlay?.();
       const node = howl?._sounds?.[0]?._node;
@@ -181,9 +181,11 @@ let currentEqPreset = 'Flat';
 function initEqFilters(audioNode) {
   if (!audioNode || typeof window === 'undefined') return;
 
-  // On Mobile: Only connect Web Audio EQ if preset is non-Flat (custom EQ requested)
-  // or if Web Audio is already unlocked. Flat preset plays natively via HTML5 Audio
-  // to avoid CORS / WebKit Web Audio mute on mobile browsers.
+  // CRITICAL MOBILE FIX: If EQ preset is 'Flat' (default) and Web Audio sourceNode
+  // isn't active yet, RETURN EARLY! Native HTML5 audio plays directly to device speakers
+  // with zero Web Audio CORS muting, zero gesture locks, and 100% volume on all phones.
+  if (currentEqPreset === 'Flat' && !sourceNode) return;
+
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
@@ -195,7 +197,6 @@ function initEqFilters(audioNode) {
       audioCtx.resume().catch(() => {});
     }
 
-    // Mobile CORS Safety Check: Do not mutate crossOrigin on active stream
     if (!sourceNode && audioNode) {
       sourceNode = audioCtx.createMediaElementSource(audioNode);
 
@@ -227,6 +228,12 @@ export function setEqPreset(presetName) {
   if (!EQ_PRESETS[presetName]) return;
   currentEqPreset = presetName;
   const gains = EQ_PRESETS[presetName].gains;
+
+  // If switching from Flat to custom preset, initialize filters if needed
+  const node = howl?._sounds?.[0]?._node;
+  if (node && !sourceNode && presetName !== 'Flat') {
+    initEqFilters(node);
+  }
 
   if (eqFilters.length === 5) {
     gains.forEach((gain, i) => {
