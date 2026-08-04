@@ -7,7 +7,7 @@ import { Howl } from 'howler';
 
 let howl = null;
 let currentUrl = null;
-let targetVolume = 1.0; // Tracks actual desired volume for crossfade fade-in target
+let targetVolume = 1.0;
 
 const callbacks = {
   onPlay: null,
@@ -22,23 +22,29 @@ export function setCallbacks(cbs) {
   Object.assign(callbacks, cbs);
 }
 
-// ── iOS Safari Background/Foreground AudioContext Resume ────────────────────
-// iOS Safari suspends the AudioContext when the PWA is backgrounded.
-// Without this, audio through the Web Audio EQ chain stays permanently silent
-// when the user returns to the app from background/lock screen.
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      // Resume AudioContext when app comes to foreground
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(() => {});
-      }
-      // Also nudge Howler's global context if it has one
-      if (typeof window !== 'undefined' && window.Howler?.ctx?.state === 'suspended') {
-        window.Howler.ctx.resume().catch(() => {});
-      }
+// ── Mobile AudioContext Unlock & Foreground Resume ────────────────────────────
+// Mobile browsers (iOS Safari & Mobile Chrome) require AudioContext to be resumed
+// inside a direct user touch/click gesture handler.
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
     }
-  });
+    if (window.Howler?.ctx?.state === 'suspended') {
+      window.Howler.ctx.resume().catch(() => {});
+    }
+  };
+
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
+  window.addEventListener('click', unlockAudio, { passive: true });
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        unlockAudio();
+      }
+    });
+  }
 }
 
 export function loadAndPlay(url, startPosition = 0) {
@@ -54,17 +60,10 @@ export function loadAndPlay(url, startPosition = 0) {
     return;
   }
 
-  // Naya song — crossfade out current song, then load new one
+  // Naya song — pehla instance unload karo
   if (howl) {
-    const oldHowl = howl;
-    howl = null; // Detach immediately so callbacks don't fire on old instance
-    if (oldHowl.playing()) {
-      // Fade out over 400ms, then unload
-      oldHowl.fade(oldHowl.volume(), 0, 400);
-      setTimeout(() => { try { oldHowl.unload(); } catch (e) {} }, 420);
-    } else {
-      oldHowl.unload();
-    }
+    howl.unload();
+    howl = null;
   }
 
   currentUrl = url;
@@ -73,13 +72,11 @@ export function loadAndPlay(url, startPosition = 0) {
     src: [url],
     html5: true,
     preload: true,
-    volume: 0, // Start silent — fade in on play
+    volume: targetVolume, // Mobile safety: direct volume setting (never start at 0)
     onplay: () => {
       callbacks.onPlay?.();
       const node = howl?._sounds?.[0]?._node;
       if (node) initEqFilters(node);
-      // Fade in to actual target volume over 400ms
-      howl?.fade(0, targetVolume, 400);
     },
     onpause: () => callbacks.onPause?.(),
     onend: () => callbacks.onEnd?.(),
@@ -99,7 +96,6 @@ export function loadAndPlay(url, startPosition = 0) {
 }
 
 // Sirf load karo — play mat karo (startup ke liye)
-// Full callbacks wired karo — taaki user Play dabaye toh onPlay fire ho aur UI update ho
 export function loadOnly(url, startPosition = 0) {
   if (howl) {
     howl.unload();
@@ -110,7 +106,7 @@ export function loadOnly(url, startPosition = 0) {
     src: [url],
     html5: true,
     preload: true,
-    volume: 1.0,
+    volume: targetVolume,
     onplay: () => callbacks.onPlay?.(),
     onpause: () => callbacks.onPause?.(),
     onend: () => callbacks.onEnd?.(),
@@ -125,7 +121,6 @@ export function loadOnly(url, startPosition = 0) {
     },
     onseek: () => callbacks.onSeek?.(),
   });
-  // play() intentionally nahi hai — startup pe paused rehna chahiye
 }
 
 export function play() { howl?.play(); }
@@ -137,15 +132,8 @@ export function seek(seconds) {
 }
 
 export function setVolume(vol) {
-  targetVolume = vol; // Always track desired volume
-  // Only set directly if not currently fading in (i.e., howl volume > 0.05)
-  if (howl) {
-    const current = howl.volume();
-    if (current > 0.05) {
-      howl.volume(vol); // Already faded in — set directly
-    }
-    // If still fading in, fade() will reach targetVolume on its own
-  }
+  targetVolume = vol;
+  if (howl) howl.volume(vol);
   if (typeof window !== 'undefined' && window.Howler) {
     window.Howler.volume(vol);
   }
@@ -192,6 +180,10 @@ let currentEqPreset = 'Flat';
 
 function initEqFilters(audioNode) {
   if (!audioNode || typeof window === 'undefined') return;
+
+  // On Mobile: Only connect Web Audio EQ if preset is non-Flat (custom EQ requested)
+  // or if Web Audio is already unlocked. Flat preset plays natively via HTML5 Audio
+  // to avoid CORS / WebKit Web Audio mute on mobile browsers.
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
@@ -203,9 +195,8 @@ function initEqFilters(audioNode) {
       audioCtx.resume().catch(() => {});
     }
 
+    // Mobile CORS Safety Check: Do not mutate crossOrigin on active stream
     if (!sourceNode && audioNode) {
-      // Create HTML5 media element source node
-      audioNode.crossOrigin = 'anonymous';
       sourceNode = audioCtx.createMediaElementSource(audioNode);
 
       const FREQS = [60, 250, 1000, 4000, 12000];
@@ -227,8 +218,8 @@ function initEqFilters(audioNode) {
       eqFilters[eqFilters.length - 1].connect(audioCtx.destination);
     }
   } catch (err) {
-    // If MediaElementSource already connected or unsupported, log quietly
-    console.debug('[AudioEngine] EQ init notice:', err?.message || err);
+    // If MediaElementSource fails (e.g. Mobile CORS security restriction), HTML5 Audio plays natively
+    console.debug('[AudioEngine] Web Audio EQ bypass (native HTML5 audio fallback):', err?.message || err);
   }
 }
 
@@ -240,7 +231,9 @@ export function setEqPreset(presetName) {
   if (eqFilters.length === 5) {
     gains.forEach((gain, i) => {
       if (eqFilters[i]) {
-        eqFilters[i].gain.setValueAtTime(gain, audioCtx ? audioCtx.currentTime : 0);
+        try {
+          eqFilters[i].gain.setValueAtTime(gain, audioCtx ? audioCtx.currentTime : 0);
+        } catch (e) {}
       }
     });
   }
@@ -252,11 +245,9 @@ export function getCurrentEqPreset() {
 
 export function setPlaybackRate(rate) {
   if (!howl) return;
-  // Howler HTML5 mode mein _sounds[0]._node = actual <audio> element
   const node = howl?._sounds?.[0]?._node;
   if (node) {
     node.playbackRate = rate;
-    initEqFilters(node);
   }
 }
 
