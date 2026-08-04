@@ -3,6 +3,8 @@
     "version": "1.1.8",
     "date": "2026-08-04",
     "updates": [
+      "⚡ Mobile Optimization & Speed Boost: In-flight API request deduplication, memory-only session caching & 34% smaller initial JS bundle",
+      "🎵 Smooth Audio Crossfade (400ms) & Background Playback Auto-Resume for mobile devices",
       "🔍 Smart Search & Natural Query Engine: Natural Language query parsing ('song by artist' e.g. 'naina by diljeet'), Hinglish typo auto-correction & multi-term relevance ranking",
       "🏆 Spotify-Style 'Top Result' Hero Card in Search for instant 1-tap hit track playback",
       "🎨 Redesigned Home Header with profile-tailored gradient text, 1-line dynamic greetings & glowing avatar profile switcher"
