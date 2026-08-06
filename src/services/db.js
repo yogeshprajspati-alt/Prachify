@@ -229,3 +229,33 @@ export async function fetchSharedPlaylist() {
   const data = await supabase(`user_playlists?user_id=eq.${SHARED_USER_ID}&playlist_id=eq.${SHARED_PLAYLIST_ID}`);
   return data?.[0]?.playlist_data || null;
 }
+
+// ── Custom PINs ─────────────────────────────────────────────────────────────
+export async function syncCustomPin(profileId, pin, hint, securityQuestion, securityAnswer) {
+  if (!ENABLED) return;
+  await supabase('user_pins?on_conflict=user_id', 'POST', {
+    user_id: profileId,
+    pin: pin,
+    hint: hint || null,
+    security_question: securityQuestion || null,
+    security_answer: securityAnswer || null,
+    updated_at: new Date().toISOString(),
+  });
+}
+
+export async function fetchCustomPins() {
+  if (!ENABLED) return {};
+  const data = await supabase('user_pins');
+  const pinMap = {};
+  if (data && Array.isArray(data)) {
+    data.forEach(row => {
+      pinMap[row.user_id] = { 
+        pin: row.pin, 
+        hint: row.hint,
+        securityQuestion: row.security_question,
+        securityAnswer: row.security_answer
+      };
+    });
+  }
+  return pinMap;
+}

@@ -177,7 +177,9 @@ export default function HannahChat() {
     setInput('');
     setIsTyping(true);
 
-    const history = [...messages, { role: 'user', text }];
+    // Context Limit Fix: Keep only the last 15 messages to prevent 400 BadRequest errors from Groq API
+    const recentMessages = messages.slice(-15);
+    const history = [...recentMessages, { role: 'user', text }];
 
     let contextString = `Current Time: ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     if (currentSong) {

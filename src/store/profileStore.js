@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { loadProfileState } from './playerStore';
+import { fetchCustomPins, syncCustomPin } from '../services/db';
 
 // ─── Profile Definitions ─────────────────────────────────────────────────────
 // Each profile gets its own isolated library (playlists, liked songs, recents)
@@ -12,6 +13,7 @@ export const PROFILES = [
   {
     id: 'prachi',
     name: 'Prachi',
+    defaultPin: '1301',
     color: '#ff4fa3',
     gradient: 'linear-gradient(135deg, #ff4fa3 0%, #ff8fd0 100%)',
     emoji: '🌸',
@@ -20,6 +22,7 @@ export const PROFILES = [
   {
     id: 'chanchal',
     name: 'Chanchal',
+    defaultPin: '1307',
     color: '#a566ff',
     gradient: 'linear-gradient(135deg, #7a3fff 0%, #c299ff 100%)',
     emoji: '✨',
@@ -28,14 +31,25 @@ export const PROFILES = [
   {
     id: 'deepak',
     name: 'Deepak',
+    defaultPin: '2403',
     color: '#2fd4c4',
     gradient: 'linear-gradient(135deg, #0fb8a8 0%, #7cf0e4 100%)',
     emoji: '🎧',
     avatar: '/profile-avatars/deepak.png',
   },
   {
+    id: 'shraddha',
+    name: 'Shraddha',
+    defaultPin: '2008',
+    color: '#ff9a3c',
+    gradient: 'linear-gradient(135deg, #ff9a3c 0%, #ff5e62 100%)',
+    emoji: '🦋',
+    avatar: '/profile-avatars/shraddha.png',
+  },
+  {
     id: 'guest',
     name: 'Guest',
+    defaultPin: null,
     color: '#8a8a8a',
     gradient: 'linear-gradient(135deg, #5a5a5a 0%, #b3b3b3 100%)',
     emoji: '👤',
@@ -66,8 +80,33 @@ const useProfileStore = create(
   persist(
     (set, get) => ({
       activeProfileId: null,
+      customPins: {}, // Stores custom PINs and hints { 'prachi': { pin: '9999', hint: '...' } }
 
       profiles: PROFILES,
+
+      hydratePinsFromDB: async () => {
+        const dbPins = await fetchCustomPins();
+        set((state) => ({
+          customPins: { ...state.customPins, ...dbPins }
+        }));
+      },
+
+      updatePin: async (profileId, newPin, hint, securityQuestion, securityAnswer) => {
+        set((state) => ({
+          customPins: {
+            ...state.customPins,
+            [profileId]: {
+              ...state.customPins[profileId],
+              pin: newPin,
+              hint: hint || '',
+              securityQuestion: securityQuestion || state.customPins[profileId]?.securityQuestion || null,
+              securityAnswer: securityAnswer || state.customPins[profileId]?.securityAnswer || null,
+            }
+          }
+        }));
+        const latest = get().customPins[profileId];
+        await syncCustomPin(profileId, newPin, hint, latest.securityQuestion, latest.securityAnswer);
+      },
 
       getActiveProfile: () => {
         const id = get().activeProfileId;
@@ -99,7 +138,10 @@ const useProfileStore = create(
     }),
     {
       name: ACTIVE_PROFILE_KEY,
-      partialize: s => ({ activeProfileId: s.activeProfileId }),
+      partialize: s => ({
+        activeProfileId: s.activeProfileId,
+        customPins: s.customPins,
+      }),
     }
   )
 );

@@ -299,6 +299,12 @@ export default function App() {
   const hydrateSharedPlaylistFromDB = usePlayerStore(s => s.hydrateSharedPlaylistFromDB);
   const pruneSkippedSongs = usePlayerStore(s => s.pruneSkippedSongs);
   const activeProfileId = useProfileStore(s => s.activeProfileId);
+  const hydratePinsFromDB = useProfileStore(s => s.hydratePinsFromDB);
+
+  // Fetch custom PINs on app boot
+  useEffect(() => {
+    hydratePinsFromDB();
+  }, [hydratePinsFromDB]);
 
   // On startup or profile switch: load profile player state + sync from Supabase
   useEffect(() => {
