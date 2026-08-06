@@ -106,8 +106,8 @@ export default function ProfileSelector({ isModal = false, onClose }) {
     return {
       pin: custom?.pin || profile?.defaultPin,
       hint: custom?.hint || 'Your birth date (DDMM)',
-      securityQuestion: custom?.securityQuestion || null,
-      securityAnswer: custom?.securityAnswer || null,
+      securityQuestion: custom?.securityQuestion || profile?.defaultSecurityQuestion || null,
+      securityAnswer: custom?.securityAnswer || profile?.defaultSecurityAnswer || null,
     };
   };
 
