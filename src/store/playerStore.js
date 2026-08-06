@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import playlistData from '../data/playlist.json';
-import { setEqPreset as setAudioEngineEq } from '../services/audioEngine';
+import { setEqPreset as setAudioEngineEq, getCurrentEqPreset } from '../services/audioEngine';
 import { syncLike, syncUnlike, syncPlaylist, deletePlaylistFromDB, fetchLikedSongs, fetchPlaylists, syncSharedPlaylist, fetchSharedPlaylist, SHARED_PLAYLIST_ID } from '../services/db';
 import { generatePlaylistCover } from '../utils/generatePlaylistCover';
 import { getActiveProfileId, getProfileById } from './profileStore';
@@ -106,8 +106,10 @@ const usePlayerStore = create(
       abLoop: { active: false, a: null, b: null },
 
       setEqPreset: (preset) => {
-        set({ eqPreset: preset });
         setAudioEngineEq(preset);
+        // Engine may reject the preset on mobile and revert to 'Flat'.
+        // Always read back from engine to keep UI in sync.
+        set({ eqPreset: getCurrentEqPreset() });
       },
 
       // ── Persistence ───────────────────────────────────────────────────────
@@ -632,17 +634,18 @@ export function loadProfileState(profileId) {
       const parsed = JSON.parse(raw);
       const p = parsed.state || parsed;
       usePlayerStore.setState({
-        currentSong: null,
-        isPlaying: false,
-        queue: [],
-        queueIndex: -1,
-        position: 0,
+        currentSong: p.currentSong || null,
+        currentPlaylistId: p.currentPlaylistId || null,
+        queue: Array.isArray(p.queue) ? p.queue : [],
+        queueIndex: typeof p.queueIndex === 'number' ? p.queueIndex : -1,
+        position: typeof p.position === 'number' ? p.position : 0,
+        isPlaying: false, // Keep paused state on start — user manually taps play
         customPlaylists: Array.isArray(p.customPlaylists) ? p.customPlaylists : [],
         likedSongs: Array.isArray(p.likedSongs) ? p.likedSongs : [],
         likedSongObjects: Array.isArray(p.likedSongObjects) ? p.likedSongObjects : [],
         recentSongs: Array.isArray(p.recentSongs) ? p.recentSongs : [],
         skippedSongs: (p.skippedSongs && typeof p.skippedSongs === 'object') ? p.skippedSongs : {},
-        // jiosaavnCache is memory-only — always reset on profile switch
+        // jiosaavnCache is memory-only — reset on profile switch
         jiosaavnCache: {},
       });
       return;

@@ -242,7 +242,13 @@ export function usePlayerEngine() {
     });
 
     // Resume from last position on app start
-    const { currentSong, position, volume, isMuted } = usePlayerStore.getState();
+    const { currentSong, position, volume, isMuted, eqPreset } = usePlayerStore.getState();
+
+    // Sync persisted EQ preset to engine (Desktop only — mobile ignores non-Flat)
+    if (eqPreset && eqPreset !== 'Flat') {
+      audio.setEqPreset(eqPreset);
+    }
+
     if (currentSong) {
       audio.setVolume(isMuted ? 0 : volume);
       
