@@ -131,17 +131,11 @@ const useProfileStore = create(
         // Synchronously load player state for selected profile BEFORE updating activeProfileId
         loadProfileState(id);
         set({ activeProfileId: id });
-        try {
-          localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify({ state: { activeProfileId: id }, version: 0 }));
-        } catch {}
       },
 
       switchProfile: () => {
         loadProfileState(null);
         set({ activeProfileId: null });
-        try {
-          localStorage.setItem(ACTIVE_PROFILE_KEY, JSON.stringify({ state: { activeProfileId: null }, version: 0 }));
-        } catch {}
       },
     }),
     {
