@@ -208,10 +208,11 @@ export const loadHannahsChoice = async (likedSongObjects = [], recentSongObjects
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-oss-120b',
+        model: 'openai/gpt-oss-120b',
         messages: [{ role: 'user', content: buildSystemPrompt(seedSongs) }],
-        max_tokens: 800,
+        max_tokens: 2048,
         temperature: 0.7,
+        reasoning_effort: "low",
         response_format: {
           type: "json_schema",
           json_schema: {
@@ -323,10 +324,11 @@ RULES:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-oss-120b',
+        model: 'openai/gpt-oss-120b',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
+        max_tokens: 2048,
         temperature: 0.7,
+        reasoning_effort: "low",
         response_format: {
           type: "json_schema",
           json_schema: {
