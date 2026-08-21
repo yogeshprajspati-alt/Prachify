@@ -61,7 +61,8 @@ export async function askHannah(messages) {
   }));
 
   const body = {
-    model: 'llama-3.3-70b-versatile',
+    model: 'qwen/qwen3.6-27b',
+    reasoning_effort: 'none',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       ...formattedMessages,

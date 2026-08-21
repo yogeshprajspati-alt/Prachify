@@ -138,7 +138,8 @@ const callGroqAPI = async (query, signal) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen/qwen3.6-27b',
+      reasoning_effort: 'none',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: query },

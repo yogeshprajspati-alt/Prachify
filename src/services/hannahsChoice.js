@@ -70,16 +70,27 @@ export const getCachedHannahsChoice = () => {
  * @returns {Array<{title: string, artist: string}>|null}
  */
 export const parseAIResponse = (raw) => {
-  const cleaned = raw
-    .replace(/```json|```/g, '')
-    .replace(/^[^[{]*/s, '') // strip any leading text before JSON
-    .trim();
   try {
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Fallback for markdown fences if schema wasn't fully enforced
+      const cleaned = raw
+        .replace(/```json|```/g, '')
+        .replace(/^[^[{]*/s, '')
+        .trim();
+      parsed = JSON.parse(cleaned);
+    }
+
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.songs)) {
+      parsed = parsed.songs;
+    }
+
     if (!Array.isArray(parsed)) return null;
     return parsed.filter(item => item.title && item.artist);
   } catch {
-    logEvent('hannah_json_parse_fail', { rawLength: raw.length });
+    logEvent('hannah_json_parse_fail', { rawLength: raw?.length || 0 });
     return null;
   }
 };
@@ -119,7 +130,7 @@ STRICT RULES:
 - Vary the artists — do NOT repeat the same artist more than twice
 - Do NOT suggest any song that appears in the input list
 - Return ONLY valid JSON, no markdown, no explanation:
-  [{"title": "...", "artist": "..."}, ...]
+  {"songs": [{"title": "...", "artist": "..."}, ...]}
 `.trim();
 
 // ── JioSaavn resolution ───────────────────────────────────────────────────────
@@ -197,10 +208,36 @@ export const loadHannahsChoice = async (likedSongObjects = [], recentSongObjects
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'gpt-oss-120b',
         messages: [{ role: 'user', content: buildSystemPrompt(seedSongs) }],
         max_tokens: 800,
         temperature: 0.7,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "song_recommendations",
+            schema: {
+              type: "object",
+              properties: {
+                songs: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      title: { type: "string" },
+                      artist: { type: "string" }
+                    },
+                    required: ["title", "artist"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["songs"],
+              additionalProperties: false
+            },
+            strict: true
+          }
+        }
       }),
     });
 
@@ -275,7 +312,7 @@ RULES:
 - NO DJ remixes or chapri tracks
 - Do NOT suggest: "${currentSong.title}" by ${currentSong.artist}
 - Return ONLY valid JSON, no markdown, no explanation:
-  [{"title": "...", "artist": "..."}]
+  {"songs": [{"title": "...", "artist": "..."}]}
   `.trim();
 
   try {
@@ -286,10 +323,36 @@ RULES:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'gpt-oss-120b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 500,
         temperature: 0.7,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "song_recommendations",
+            schema: {
+              type: "object",
+              properties: {
+                songs: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      title: { type: "string" },
+                      artist: { type: "string" }
+                    },
+                    required: ["title", "artist"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["songs"],
+              additionalProperties: false
+            },
+            strict: true
+          }
+        }
       }),
       signal,
     });
