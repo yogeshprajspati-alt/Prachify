@@ -321,7 +321,7 @@ export async function sendChatMessage(messages, contextString, onChunk, onComple
   const url = `https://api.groq.com/openai/v1/chat/completions`;
 
   const payload = {
-    model: 'qwen/qwen3.6-27b', // Upgraded for better Hinglish and replacing deprecated Llama
+    model: 'qwen/qwen3.8-27b', // Upgraded for better Hinglish and replacing deprecated Llama
     reasoning_effort: 'none',
     messages: contents,
     stream: true,
