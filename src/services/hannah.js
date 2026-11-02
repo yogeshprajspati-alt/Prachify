@@ -61,7 +61,7 @@ export async function askHannah(messages) {
   }));
 
   const body = {
-    model: 'qwen/qwen3.6-27b',
+    model: 'qwen/qwen3.8-27b',
     reasoning_effort: 'none',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
